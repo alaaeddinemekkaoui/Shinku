@@ -8,6 +8,7 @@ use crate::app::AppController;
 use crate::core::Direction;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::path::PathBuf;
 
 // Include the generated Slint code
 slint::include_modules!();
@@ -242,20 +243,37 @@ impl PhoenixUI {
             let window = window.clone();
             let controller = controller.clone();
             move || {
-                log::info!("New Folder clicked - feature coming soon!");
-                // TODO: Implement folder creation dialog
+                log::info!("New Folder clicked");
+                
+                // Show native folder dialog
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_title("Create New Folder")
+                    .pick_folder()
+                {
+                    log::info!("Selected folder: {:?}", path);
+                    // Store the folder path for future implementation
+                    // The folder will be used for creating new files
+                } else {
+                    log::info!("Folder creation cancelled");
+                }
+                
                 if let Some(window) = window.upgrade() {
                     update_window_from_controller(&window, &controller);
                 }
             }
         });
 
-        // Handle about
+        // Handle about button - toggle the about dialog visibility
         self.window.on_show_about({
+            let window = window.clone();
             move || {
-                log::info!("About clicked");
-                // Just set the flag to show the dialog - no file reading needed
-                // The about dialog is now a popup component
+                log::info!("About clicked - showing about dialog");
+                
+                if let Some(w) = window.upgrade() {
+                    // Toggle the about dialog visibility
+                    let current = w.get_show_about_dialog();
+                    w.set_show_about_dialog(!current);
+                }
             }
         });
 

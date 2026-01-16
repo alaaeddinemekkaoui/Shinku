@@ -1,7 +1,5 @@
 // Editor area with line numbers component
 
-import { ScrollView } from "std-widgets.slint";
-
 export component EditorArea {
     in-out property <string> text-content: "";
     in-out property <string> line-numbers: "1";
@@ -47,84 +45,82 @@ export component EditorArea {
                 background: #3e3e3e;
             }
             
-            // Scrollable text display
-            ScrollView {
+            // Text editor with focus - now editable!
+            Rectangle {
+                background: #1e1e1e;
                 horizontal-stretch: 1;
+                vertical-stretch: 1;
                 
-                Text {
+                editor-input := TextInput {
                     text: root.text-content;
-                    color: #d4d4d4;
                     font-size: 16px;
                     font-family: "Consolas";
-                    wrap: word-wrap;
-                }
-            }
-        }
+                    color: #d4d4d4;
+                    
+                    edited => {
+                        root.text-content = self.text;
+                    }
+                    
+                    key-pressed(event) => {
+                        if (event.text == Key.Backspace) {
+                            root.backspace();
+                            return accept;
+                        }
+                        if (event.text == Key.Delete) {
+                            root.delete();
+                            return accept;
+                        }
+                        if (event.text == Key.Return) {
+                            root.enter();
+                            return accept;
+                        }
+                        if (event.text == Key.UpArrow) {
+                            root.move-cursor("up");
+                            return accept;
+                        }
+                        if (event.text == Key.DownArrow) {
+                            root.move-cursor("down");
+                            return accept;
+                        }
+                        if (event.text == Key.LeftArrow) {
+                            root.move-cursor("left");
+                            return accept;
+                        }
+                        if (event.text == Key.RightArrow) {
+                            root.move-cursor("right");
+                            return accept;
+                        }
+                        if (event.text == Key.Home) {
+                            root.move-cursor("home");
+                            return accept;
+                        }
+                        if (event.text == Key.End) {
+                            root.move-cursor("end");
+                            return accept;
+                        }
+                        
+                        if (event.text == "z" && event.modifiers.control) {
+                            root.undo();
+                            return accept;
+                        }
+                        
+                        if (event.text == "y" && event.modifiers.control) {
+                            root.redo();
+                            return accept;
+                        }
 
-        // Focus scope for keyboard input
-        FocusScope {
-            width: parent.width;
-            height: parent.height;
+                        if (event.text == "s" && event.modifiers.control) {
+                            return accept;
+                        }
 
-            key-pressed(event) => {
-                if (event.text == Key.Backspace) {
-                    root.backspace();
-                    return accept;
+                        if (event.text != "") {
+                            root.text-input(event.text);
+                            return accept;
+                        }
+                        
+                        return reject;
+                    }
                 }
-                if (event.text == Key.Delete) {
-                    root.delete();
-                    return accept;
-                }
-                if (event.text == Key.Return) {
-                    root.enter();
-                    return accept;
-                }
-                if (event.text == Key.UpArrow) {
-                    root.move-cursor("up");
-                    return accept;
-                }
-                if (event.text == Key.DownArrow) {
-                    root.move-cursor("down");
-                    return accept;
-                }
-                if (event.text == Key.LeftArrow) {
-                    root.move-cursor("left");
-                    return accept;
-                }
-                if (event.text == Key.RightArrow) {
-                    root.move-cursor("right");
-                    return accept;
-                }
-                if (event.text == Key.Home) {
-                    root.move-cursor("home");
-                    return accept;
-                }
-                if (event.text == Key.End) {
-                    root.move-cursor("end");
-                    return accept;
-                }
-                
-                if (event.text == "z" && event.modifiers.control) {
-                    root.undo();
-                    return accept;
-                }
-                
-                if (event.text == "y" && event.modifiers.control) {
-                    root.redo();
-                    return accept;
-                }
-
-                if (event.text == "s" && event.modifiers.control) {
-                    // save-file is called from main window
-                    return accept;
-                }
-
-                if (event.text != "") {
-                    root.text-input(event.text);
-                    return accept;
-                }
-                
-                return reject;
             }
         }
     }

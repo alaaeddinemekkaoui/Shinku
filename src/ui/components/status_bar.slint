@@ -8,40 +8,43 @@ export component StatusBar {
     in-out property <bool> can-redo: false;
     
     height: 30px;
-    background: #007acc;
 
-    HorizontalBox {
-        padding: 6px;
-        spacing: 16px;
+    Rectangle {
+        background: #007acc;
+        
+        HorizontalLayout {
+            padding: 6px;
+            spacing: 16px;
 
-        Text {
-            text: "Shinku Editor";
-            color: #ffffff;
-            font-size: 12px;
-            vertical-alignment: center;
-        }
+            Text {
+                text: "Shinku Editor";
+                color: #ffffff;
+                font-size: 12px;
+                vertical-alignment: center;
+            }
 
-        Rectangle { horizontal-stretch: 1; }
+            Rectangle { horizontal-stretch: 1; }
 
-        Text {
-            text: "Ln " + root.cursor-line + ", Col " + root.cursor-column;
-            color: #ffffff;
-            font-size: 12px;
-            vertical-alignment: center;
-        }
+            Text {
+                text: "Ln " + root.cursor-line + ", Col " + root.cursor-column;
+                color: #ffffff;
+                font-size: 12px;
+                vertical-alignment: center;
+            }
 
-        if root.can-undo: Text {
-            text: "↶";
-            color: #ffffff;
-            font-size: 14px;
-            vertical-alignment: center;
-        }
+            if root.can-undo: Text {
+                text: "↶";
+                color: #ffffff;
+                font-size: 14px;
+                vertical-alignment: center;
+            }
 
-        if root.can-redo: Text {
-            text: "↷";
-            color: #ffffff;
-            font-size: 14px;
-            vertical-alignment: center;
+            if root.can-redo: Text {
+                text: "↷";
+                color: #ffffff;
+                font-size: 14px;
+                vertical-alignment: center;
+            }
         }
     }
 }

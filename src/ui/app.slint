@@ -75,13 +75,16 @@ export component AppWindow inherits Window {
 
         // Find bar
         find-bar := FindBar {
-            visible: root.show-find-bar;
+            is-visible: root.show-find-bar;
             find-text: root.find-text;
             replace-text: root.replace-text;
             
             find-text-changed(text) => { root.find-text-changed(text); }
             replace-all(find, replace) => { root.replace-all(find, replace); }
-            close-find() => { root.close-find(); }
+            close-find() => { 
+                root.show-find-bar = false;
+                root.close-find(); 
+            }
         }
 
         // Status bar
@@ -96,7 +99,7 @@ export component AppWindow inherits Window {
 
     // About dialog (popup overlay)
     about-dialog := AboutDialog {
-        visible: root.show-about-dialog;
+        show-about: root.show-about-dialog;
         close => {
             root.show-about-dialog = false;
         }

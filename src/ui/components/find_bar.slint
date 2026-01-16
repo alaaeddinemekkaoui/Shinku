@@ -1,21 +1,19 @@
 // Find and Replace bar component
 
-import { Button } from "std-widgets.slint";
-
 export component FindBar {
     in-out property <string> find-text: "";
     in-out property <string> replace-text: "";
-    in-out property <bool> visible: false;
+    in-out property <bool> is-visible: false;
     
     callback find-text-changed(string);
     callback replace-all(string, string);
     callback close-find();
     
-    if root.visible: Rectangle {
+    if root.is-visible: Rectangle {
         height: 40px;
         background: #2d2d2d;
         
-        HorizontalBox {
+        HorizontalLayout {
             padding: 8px;
             spacing: 12px;
             
@@ -50,21 +48,48 @@ export component FindBar {
                 }
             }
             
-            Button {
-                text: "Replace All";
-                clicked => {
-                    root.replace-all(root.find-text, root.replace-text);
+            replace-all-btn := Rectangle {
+                width: 100px;
+                height: 30px;
+                background: #007acc;
+                border-radius: 4px;
+                
+                Text {
+                    text: "Replace All";
+                    color: #ffffff;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    font-size: 12px;
+                }
+                
+                TouchArea {
+                    clicked => {
+                        root.replace-all(root.find-text, root.replace-text);
+                    }
                 }
             }
             
             Rectangle { horizontal-stretch: 1; }
             
-            Button {
-                text: "✕";
+            close-btn := Rectangle {
                 width: 30px;
-                clicked => {
-                    root.visible = false;
-                    root.close-find();
+                height: 30px;
+                background: #555555;
+                border-radius: 4px;
+                
+                Text {
+                    text: "✕";
+                    color: #ffffff;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    font-size: 14px;
+                }
+                
+                TouchArea {
+                    clicked => {
+                        root.is-visible = false;
+                        root.close-find();
+                    }
                 }
             }
         }

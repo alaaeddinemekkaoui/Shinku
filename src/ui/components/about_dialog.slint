@@ -1,18 +1,18 @@
 // About dialog component
 
 export component AboutDialog {
-    in-out property <bool> visible: false;
+    in-out property <bool> show-about: false;
     
     callback close();
     
-    if root.visible: Rectangle {
+    if root.show-about: Rectangle {
         width: 100%;
         height: 100%;
         background: rgba(0, 0, 0, 0.8);
         
         TouchArea {
             clicked => {
-                root.visible = false;
+                root.show-about = false;
                 root.close();
             }
         }
@@ -33,7 +33,7 @@ export component AboutDialog {
                 Text {
                     text: "Shinku Editor";
                     font-size: 24px;
-                    font-weight: bold;
+                    font-weight: 800;
                     color: #d4d4d4;
                 }
                 
@@ -52,7 +52,7 @@ export component AboutDialog {
                     text: "A modern, lightweight text editor written in 100% Rust";
                     font-size: 12px;
                     color: #d4d4d4;
-                    wrap: word;
+                    wrap: word-wrap;
                 }
                 
                 Text {
@@ -87,7 +87,7 @@ export component AboutDialog {
                         
                         TouchArea {
                             clicked => {
-                                root.visible = false;
+                                root.show-about = false;
                                 root.close();
                             }
                         }
