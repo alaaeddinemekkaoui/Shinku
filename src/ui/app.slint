@@ -27,7 +27,10 @@ export component AppWindow inherits Window {
     callback undo();
     callback redo();
     callback new-file();
+    callback new-folder();
     callback save-file();
+    callback save-file-as();
+    callback show-about();
 
     // Main layout
     VerticalBox {
@@ -77,6 +80,66 @@ export component AppWindow inherits Window {
                     menu-touch-save := TouchArea {
                         clicked => {
                             root.save-file();
+                        }
+                    }
+                }
+
+                menu-button-save-as := Rectangle {
+                    width: 70px;
+                    height: 24px;
+                    background: menu-touch-save-as.has-hover ? #3e3e3e : transparent;
+                    border-radius: 4px;
+                    
+                    Text {
+                        text: "Save As";
+                        color: #cccccc;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                    
+                    menu-touch-save-as := TouchArea {
+                        clicked => {
+                            root.save-file-as();
+                        }
+                    }
+                }
+
+                menu-button-new-folder := Rectangle {
+                    width: 90px;
+                    height: 24px;
+                    background: menu-touch-new-folder.has-hover ? #3e3e3e : transparent;
+                    border-radius: 4px;
+                    
+                    Text {
+                        text: "New Folder";
+                        color: #cccccc;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                    
+                    menu-touch-new-folder := TouchArea {
+                        clicked => {
+                            root.new-folder();
+                        }
+                    }
+                }
+
+                menu-button-about := Rectangle {
+                    width: 60px;
+                    height: 24px;
+                    background: menu-touch-about.has-hover ? #3e3e3e : transparent;
+                    border-radius: 4px;
+                    
+                    Text {
+                        text: "About";
+                        color: #cccccc;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                    
+                    menu-touch-about := TouchArea {
+                        clicked => {
+                            root.show-about();
                         }
                     }
                 }

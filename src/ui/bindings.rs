@@ -178,6 +178,53 @@ impl PhoenixUI {
                 }
             }
         });
+
+        // Handle save as
+        self.window.on_save_file_as({
+            let window = window.clone();
+            let controller = controller.clone();
+            move || {
+                // For now, just show a message - will implement file dialog in Phase 2
+                log::info!("Save As clicked - file dialog coming in Phase 2!");
+                // TODO: Show native file picker dialog
+                // let path = native_file_dialog::save();
+                // controller.borrow_mut().save_file_as(path);
+                if let Some(window) = window.upgrade() {
+                    update_window_from_controller(&window, &controller);
+                }
+            }
+        });
+
+        // Handle new folder
+        self.window.on_new_folder({
+            let window = window.clone();
+            let controller = controller.clone();
+            move || {
+                log::info!("New Folder clicked - feature coming soon!");
+                // TODO: Implement folder creation dialog
+                if let Some(window) = window.upgrade() {
+                    update_window_from_controller(&window, &controller);
+                }
+            }
+        });
+
+        // Handle about
+        self.window.on_show_about({
+            let window = window.clone();
+            move || {
+                log::info!("About clicked");
+                // Read and display ABOUT.md content
+                if let Ok(about_content) = std::fs::read_to_string("ABOUT.md") {
+                    log::info!("About Phoenix:\n{}", about_content);
+                    // TODO: Show in a dialog in Phase 2
+                } else {
+                    log::warn!("ABOUT.md file not found");
+                }
+                if let Some(window) = window.upgrade() {
+                    // Could update window with about dialog
+                }
+            }
+        });
     }
 
     /// Update the UI with current controller state
