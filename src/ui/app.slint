@@ -1,0 +1,243 @@
+// Phoenix Text Editor UI
+// Modern, lightweight text editor inspired by the phoenix and legendary adventures
+
+import { Button, VerticalBox, HorizontalBox, TextEdit, ScrollView } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    title: "Project Phoenix";
+    preferred-width: 1000px;
+    preferred-height: 700px;
+    background: #1e1e1e;
+
+    // Properties exposed to Rust
+    in-out property <string> text-content: "";
+    in-out property <string> document-title: "Untitled";
+    in-out property <int> cursor-line: 1;
+    in-out property <int> cursor-column: 1;
+    in-out property <bool> is-modified: false;
+    in-out property <bool> can-undo: false;
+    in-out property <bool> can-redo: false;
+
+    // Callbacks to Rust
+    callback text-input(string);
+    callback backspace();
+    callback delete();
+    callback enter();
+    callback move-cursor(string);
+    callback undo();
+    callback redo();
+    callback new-file();
+    callback save-file();
+
+    // Main layout
+    VerticalBox {
+        // Menu bar
+        menu-bar := Rectangle {
+            height: 40px;
+            background: #2d2d2d;
+            
+            HorizontalBox {
+                padding: 8px;
+                spacing: 16px;
+
+                // File menu items (simplified - in real app would use proper menu)
+                menu-button-new := Rectangle {
+                    width: 60px;
+                    height: 24px;
+                    background: menu-touch-new.has-hover ? #3e3e3e : transparent;
+                    border-radius: 4px;
+                    
+                    Text {
+                        text: "New";
+                        color: #cccccc;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                    
+                    menu-touch-new := TouchArea {
+                        clicked => {
+                            root.new-file();
+                        }
+                    }
+                }
+
+                menu-button-save := Rectangle {
+                    width: 60px;
+                    height: 24px;
+                    background: menu-touch-save.has-hover ? #3e3e3e : transparent;
+                    border-radius: 4px;
+                    
+                    Text {
+                        text: "Save";
+                        color: #cccccc;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                    
+                    menu-touch-save := TouchArea {
+                        clicked => {
+                            root.save-file();
+                        }
+                    }
+                }
+
+                // Spacer
+                Rectangle { 
+                    horizontal-stretch: 1; 
+                }
+
+                // Title in center
+                Text {
+                    text: root.document-title;
+                    color: root.is-modified ? #ff9800 : #cccccc;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+
+                // Spacer
+                Rectangle { 
+                    horizontal-stretch: 1; 
+                }
+            }
+        }
+
+        // Editor area
+        editor-area := Rectangle {
+            background: #1e1e1e;
+            vertical-stretch: 1;
+
+            // Scrollable text display
+            ScrollView {
+                width: parent.width;
+                height: parent.height;
+                
+                text-display := Text {
+                    text: root.text-content;
+                    color: #d4d4d4;
+                    font-size: 16px;
+                    wrap: word-wrap;
+                }
+            }
+
+            // Focus capture for keyboard events
+            key-handler := FocusScope {
+                width: parent.width;
+                height: parent.height;
+
+                key-pressed(event) => {
+                    if (event.text == Key.Backspace) {
+                        root.backspace();
+                        return accept;
+                    }
+                    if (event.text == Key.Delete) {
+                        root.delete();
+                        return accept;
+                    }
+                    if (event.text == Key.Return) {
+                        root.enter();
+                        return accept;
+                    }
+                    if (event.text == Key.UpArrow) {
+                        root.move-cursor("up");
+                        return accept;
+                    }
+                    if (event.text == Key.DownArrow) {
+                        root.move-cursor("down");
+                        return accept;
+                    }
+                    if (event.text == Key.LeftArrow) {
+                        root.move-cursor("left");
+                        return accept;
+                    }
+                    if (event.text == Key.RightArrow) {
+                        root.move-cursor("right");
+                        return accept;
+                    }
+                    if (event.text == Key.Home) {
+                        root.move-cursor("home");
+                        return accept;
+                    }
+                    if (event.text == Key.End) {
+                        root.move-cursor("end");
+                        return accept;
+                    }
+                    
+                    // Handle Ctrl+Z (Undo)
+                    if (event.text == "z" && event.modifiers.control) {
+                        root.undo();
+                        return accept;
+                    }
+                    
+                    // Handle Ctrl+Y (Redo)
+                    if (event.text == "y" && event.modifiers.control) {
+                        root.redo();
+                        return accept;
+                    }
+
+                    // Handle Ctrl+S (Save)
+                    if (event.text == "s" && event.modifiers.control) {
+                        root.save-file();
+                        return accept;
+                    }
+
+                    // Handle Ctrl+N (New)
+                    if (event.text == "n" && event.modifiers.control) {
+                        root.new-file();
+                        return accept;
+                    }
+
+                    // Regular text input
+                    if (event.text != "") {
+                        root.text-input(event.text);
+                        return accept;
+                    }
+
+                    return reject;
+                }
+            }
+        }
+
+        // Status bar
+        status-bar := Rectangle {
+            height: 30px;
+            background: #007acc;
+
+            HorizontalBox {
+                padding: 6px;
+                spacing: 16px;
+
+                Text {
+                    text: "Phoenix Editor";
+                    color: #ffffff;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                // Cursor position
+                Text {
+                    text: "Ln " + root.cursor-line + ", Col " + root.cursor-column;
+                    color: #ffffff;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                // Undo/Redo indicators
+                if root.can-undo: Text {
+                    text: "↶";
+                    color: #ffffff;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+
+                if root.can-redo: Text {
+                    text: "↷";
+                    color: #ffffff;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
