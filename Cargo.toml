@@ -1,9 +1,9 @@
 [package]
-name = "project-phoenix"
+name = "shinku"
 version = "0.1.0"
 edition = "2021"
-authors = ["Phoenix Team"]
-description = "A modern, lightweight, native text editor written in Rust"
+authors = ["Alaa"]
+description = "Shinku - A modern, lightweight, native text editor written in Rust"
 license = "MIT"
 
 [dependencies]
@@ -20,6 +20,7 @@ thiserror = "1.0"
 # Logging
 log = "0.4"
 env_logger = "0.11"
+rfd = "0.17.2"
 
 [build-dependencies]
 slint-build = "1.8"

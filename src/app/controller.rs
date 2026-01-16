@@ -114,6 +114,23 @@ impl AppController {
         Ok(())
     }
 
+    /// Move cursor by lines (for Page Up/Page Down - moves by 10 lines)
+    pub fn move_cursor_by_lines(&mut self, line_offset: i32) -> Result<()> {
+        let current_pos = self.state.editor().cursor_position();
+        let new_line = (current_pos.line as i32 + line_offset).max(0) as usize;
+        let total_lines = self.state.editor().line_count().saturating_sub(1);
+        let clamped_line = new_line.min(total_lines);
+        
+        for _ in 0..line_offset.abs() {
+            if line_offset > 0 {
+                self.state.editor_mut().move_cursor(Direction::Down)?;
+            } else {
+                self.state.editor_mut().move_cursor(Direction::Up)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Handle undo
     pub fn undo(&mut self) -> Result<bool> {
         log::debug!("Undo");

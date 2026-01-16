@@ -1,0 +1,131 @@
+// Editor area with line numbers component
+
+import { ScrollView } from "std-widgets.slint";
+
+export component EditorArea {
+    in-out property <string> text-content: "";
+    in-out property <string> line-numbers: "1";
+    
+    callback text-input(string);
+    callback backspace();
+    callback delete();
+    callback enter();
+    callback move-cursor(string);
+    callback undo();
+    callback redo();
+    
+    Rectangle {
+        background: #1e1e1e;
+        vertical-stretch: 1;
+
+        HorizontalLayout {
+            spacing: 0px;
+            
+            // Line numbers gutter
+            Rectangle {
+                width: 60px;
+                background: #252525;
+                
+                VerticalLayout {
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    padding-left: 4px;
+                    padding-right: 4px;
+                    Text {
+                        text: root.line-numbers;
+                        color: #858585;
+                        font-size: 14px;
+                        font-family: "Consolas";
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+            
+            // Divider
+            Rectangle {
+                width: 1px;
+                background: #3e3e3e;
+            }
+            
+            // Scrollable text display
+            ScrollView {
+                horizontal-stretch: 1;
+                
+                Text {
+                    text: root.text-content;
+                    color: #d4d4d4;
+                    font-size: 16px;
+                    font-family: "Consolas";
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        // Focus scope for keyboard input
+        FocusScope {
+            width: parent.width;
+            height: parent.height;
+
+            key-pressed(event) => {
+                if (event.text == Key.Backspace) {
+                    root.backspace();
+                    return accept;
+                }
+                if (event.text == Key.Delete) {
+                    root.delete();
+                    return accept;
+                }
+                if (event.text == Key.Return) {
+                    root.enter();
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) {
+                    root.move-cursor("up");
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    root.move-cursor("down");
+                    return accept;
+                }
+                if (event.text == Key.LeftArrow) {
+                    root.move-cursor("left");
+                    return accept;
+                }
+                if (event.text == Key.RightArrow) {
+                    root.move-cursor("right");
+                    return accept;
+                }
+                if (event.text == Key.Home) {
+                    root.move-cursor("home");
+                    return accept;
+                }
+                if (event.text == Key.End) {
+                    root.move-cursor("end");
+                    return accept;
+                }
+                
+                if (event.text == "z" && event.modifiers.control) {
+                    root.undo();
+                    return accept;
+                }
+                
+                if (event.text == "y" && event.modifiers.control) {
+                    root.redo();
+                    return accept;
+                }
+
+                if (event.text == "s" && event.modifiers.control) {
+                    // save-file is called from main window
+                    return accept;
+                }
+
+                if (event.text != "") {
+                    root.text-input(event.text);
+                    return accept;
+                }
+                
+                return reject;
+            }
+        }
+    }
+}

@@ -164,6 +164,35 @@ impl PhoenixUI {
             }
         });
 
+        // Handle open file
+        self.window.on_open_file({
+            let window = window.clone();
+            let controller = controller.clone();
+            move || {
+                log::info!("Open File clicked - showing file dialog");
+                
+                // Show native open file dialog
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Text Files", &["txt", "md", "rs", "toml", "json", "xml", "py", "js", "ts", "html", "css"])
+                    .add_filter("All Files", &["*"])
+                    .set_title("Open File")
+                    .pick_file()
+                {
+                    log::info!("Opening: {:?}", path);
+                    match controller.borrow_mut().open_file(path) {
+                        Ok(msg) => log::info!("{}", msg),
+                        Err(e) => log::error!("Open error: {}", e),
+                    }
+                } else {
+                    log::info!("Open File cancelled");
+                }
+                
+                if let Some(window) = window.upgrade() {
+                    update_window_from_controller(&window, &controller);
+                }
+            }
+        });
+
         // Handle save
         self.window.on_save_file({
             let window = window.clone();
@@ -184,11 +213,24 @@ impl PhoenixUI {
             let window = window.clone();
             let controller = controller.clone();
             move || {
-                // For now, just show a message - will implement file dialog in Phase 2
-                log::info!("Save As clicked - file dialog coming in Phase 2!");
-                // TODO: Show native file picker dialog
-                // let path = native_file_dialog::save();
-                // controller.borrow_mut().save_file_as(path);
+                log::info!("Save As clicked - showing file dialog");
+                
+                // Show native save file dialog
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Text Files", &["txt", "md", "rs", "toml", "json", "xml"])
+                    .add_filter("All Files", &["*"])
+                    .set_title("Save File As")
+                    .save_file()
+                {
+                    log::info!("Saving to: {:?}", path);
+                    match controller.borrow_mut().save_file_as(path) {
+                        Ok(msg) => log::info!("{}", msg),
+                        Err(e) => log::error!("Save error: {}", e),
+                    }
+                } else {
+                    log::info!("Save As cancelled");
+                }
+                
                 if let Some(window) = window.upgrade() {
                     update_window_from_controller(&window, &controller);
                 }
@@ -210,19 +252,64 @@ impl PhoenixUI {
 
         // Handle about
         self.window.on_show_about({
-            let window = window.clone();
             move || {
                 log::info!("About clicked");
-                // Read and display ABOUT.md content
-                if let Ok(about_content) = std::fs::read_to_string("ABOUT.md") {
-                    log::info!("About Phoenix:\n{}", about_content);
-                    // TODO: Show in a dialog in Phase 2
-                } else {
-                    log::warn!("ABOUT.md file not found");
+                // Just set the flag to show the dialog - no file reading needed
+                // The about dialog is now a popup component
+            }
+        });
+
+        // Handle find text changed
+        self.window.on_find_text_changed({
+            let _window = window.clone();
+            let _controller = controller.clone();
+            move |find_text| {
+                log::debug!("Find text changed: {}", find_text);
+                // In a full implementation, would highlight matches in the text
+                // For now, just log it
+            }
+        });
+
+        // Handle replace all
+        self.window.on_replace_all({
+            let window = window.clone();
+            let controller = controller.clone();
+            move |find_text, replace_text| {
+                let find_str = find_text.to_string();
+                let replace_str = replace_text.to_string();
+                
+                if find_str.is_empty() {
+                    log::warn!("Find text is empty");
+                    return;
                 }
+                
+                log::info!("Replace all '{}' with '{}'", find_str, replace_str);
+                
+                let content = controller.borrow().content();
+                let new_content = content.replace(&find_str, &replace_str);
+                
+                if new_content != content {
+                    // Clear document and insert new content
+                    let mut ctrl = controller.borrow_mut();
+                    ctrl.new_file().ok();
+                    ctrl.set_content(&new_content);
+                    drop(ctrl);
+                    
+                    log::info!("Replaced all occurrences");
+                }
+                
                 if let Some(window) = window.upgrade() {
-                    // Could update window with about dialog
+                    update_window_from_controller(&window, &controller);
                 }
+            }
+        });
+
+        // Handle close find
+        self.window.on_close_find({
+            let _window = window.clone();
+            let _controller = controller.clone();
+            move || {
+                log::debug!("Find bar closed");
             }
         });
     }
@@ -248,7 +335,15 @@ fn update_window_from_controller(
     
     // Update content
     let content = controller.content();
-    window.set_text_content(content.into());
+    window.set_text_content(content.clone().into());
+    
+    // Generate line numbers based on content
+    let line_count = content.lines().count().max(1);
+    let line_numbers: String = (1..=line_count)
+        .map(|n| n.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    window.set_line_numbers(line_numbers.into());
     
     // Update cursor position
     let (line, col) = controller.cursor_position_display();

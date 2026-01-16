@@ -1,24 +1,34 @@
-// Phoenix Text Editor UI
-// Modern, lightweight text editor inspired by the phoenix and legendary adventures
+// Shinku Text Editor - Main Window
+// A modern, lightweight text editor written in Rust
 
-import { Button, VerticalBox, HorizontalBox, TextEdit, ScrollView } from "std-widgets.slint";
+import { VerticalBox } from "std-widgets.slint";
+import { MenuBar } from "components/menu.slint";
+import { FindBar } from "components/find_bar.slint";
+import { EditorArea } from "components/editor.slint";
+import { StatusBar } from "components/status_bar.slint";
+import { AboutDialog } from "components/about_dialog.slint";
 
 export component AppWindow inherits Window {
-    title: "Project Phoenix";
+    title: "Shinku Editor";
     preferred-width: 1000px;
     preferred-height: 700px;
     background: #1e1e1e;
 
-    // Properties exposed to Rust
+    // Properties
     in-out property <string> text-content: "";
+    in-out property <string> line-numbers: "1";
     in-out property <string> document-title: "Untitled";
     in-out property <int> cursor-line: 1;
     in-out property <int> cursor-column: 1;
     in-out property <bool> is-modified: false;
     in-out property <bool> can-undo: false;
     in-out property <bool> can-redo: false;
+    in-out property <bool> show-find-bar: false;
+    in-out property <bool> show-about-dialog: false;
+    in-out property <string> find-text: "";
+    in-out property <string> replace-text: "";
 
-    // Callbacks to Rust
+    // Callbacks
     callback text-input(string);
     callback backspace();
     callback delete();
@@ -27,280 +37,68 @@ export component AppWindow inherits Window {
     callback undo();
     callback redo();
     callback new-file();
+    callback open-file();
     callback new-folder();
     callback save-file();
     callback save-file-as();
     callback show-about();
+    callback find-text-changed(string);
+    callback replace-all(string, string);
+    callback close-find();
 
-    // Main layout
     VerticalBox {
         // Menu bar
-        menu-bar := Rectangle {
-            height: 40px;
-            background: #2d2d2d;
-            
-            HorizontalBox {
-                padding: 8px;
-                spacing: 16px;
-
-                // File menu items (simplified - in real app would use proper menu)
-                menu-button-new := Rectangle {
-                    width: 60px;
-                    height: 24px;
-                    background: menu-touch-new.has-hover ? #3e3e3e : transparent;
-                    border-radius: 4px;
-                    
-                    Text {
-                        text: "New";
-                        color: #cccccc;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
-                    }
-                    
-                    menu-touch-new := TouchArea {
-                        clicked => {
-                            root.new-file();
-                        }
-                    }
-                }
-
-                menu-button-save := Rectangle {
-                    width: 60px;
-                    height: 24px;
-                    background: menu-touch-save.has-hover ? #3e3e3e : transparent;
-                    border-radius: 4px;
-                    
-                    Text {
-                        text: "Save";
-                        color: #cccccc;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
-                    }
-                    
-                    menu-touch-save := TouchArea {
-                        clicked => {
-                            root.save-file();
-                        }
-                    }
-                }
-
-                menu-button-save-as := Rectangle {
-                    width: 70px;
-                    height: 24px;
-                    background: menu-touch-save-as.has-hover ? #3e3e3e : transparent;
-                    border-radius: 4px;
-                    
-                    Text {
-                        text: "Save As";
-                        color: #cccccc;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
-                    }
-                    
-                    menu-touch-save-as := TouchArea {
-                        clicked => {
-                            root.save-file-as();
-                        }
-                    }
-                }
-
-                menu-button-new-folder := Rectangle {
-                    width: 90px;
-                    height: 24px;
-                    background: menu-touch-new-folder.has-hover ? #3e3e3e : transparent;
-                    border-radius: 4px;
-                    
-                    Text {
-                        text: "New Folder";
-                        color: #cccccc;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
-                    }
-                    
-                    menu-touch-new-folder := TouchArea {
-                        clicked => {
-                            root.new-folder();
-                        }
-                    }
-                }
-
-                menu-button-about := Rectangle {
-                    width: 60px;
-                    height: 24px;
-                    background: menu-touch-about.has-hover ? #3e3e3e : transparent;
-                    border-radius: 4px;
-                    
-                    Text {
-                        text: "About";
-                        color: #cccccc;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
-                    }
-                    
-                    menu-touch-about := TouchArea {
-                        clicked => {
-                            root.show-about();
-                        }
-                    }
-                }
-
-                // Spacer
-                Rectangle { 
-                    horizontal-stretch: 1; 
-                }
-
-                // Title in center
-                Text {
-                    text: root.document-title;
-                    color: root.is-modified ? #ff9800 : #cccccc;
-                    font-size: 14px;
-                    vertical-alignment: center;
-                }
-
-                // Spacer
-                Rectangle { 
-                    horizontal-stretch: 1; 
-                }
+        menu-bar := MenuBar {
+            new-file => { root.new-file(); }
+            open-file => { root.open-file(); }
+            save-file => { root.save-file(); }
+            save-file-as => { root.save-file-as(); }
+            show-about => {
+                root.show-about-dialog = true;
+                root.show-about();
             }
         }
 
         // Editor area
-        editor-area := Rectangle {
-            background: #1e1e1e;
-            vertical-stretch: 1;
+        editor-area := EditorArea {
+            text-content: root.text-content;
+            line-numbers: root.line-numbers;
+            
+            text-input(text) => { root.text-input(text); }
+            backspace() => { root.backspace(); }
+            delete() => { root.delete(); }
+            enter() => { root.enter(); }
+            move-cursor(dir) => { root.move-cursor(dir); }
+            undo() => { root.undo(); }
+            redo() => { root.redo(); }
+        }
 
-            // Scrollable text display
-            ScrollView {
-                width: parent.width;
-                height: parent.height;
-                
-                text-display := Text {
-                    text: root.text-content;
-                    color: #d4d4d4;
-                    font-size: 16px;
-                    wrap: word-wrap;
-                }
-            }
-
-            // Focus capture for keyboard events
-            key-handler := FocusScope {
-                width: parent.width;
-                height: parent.height;
-
-                key-pressed(event) => {
-                    if (event.text == Key.Backspace) {
-                        root.backspace();
-                        return accept;
-                    }
-                    if (event.text == Key.Delete) {
-                        root.delete();
-                        return accept;
-                    }
-                    if (event.text == Key.Return) {
-                        root.enter();
-                        return accept;
-                    }
-                    if (event.text == Key.UpArrow) {
-                        root.move-cursor("up");
-                        return accept;
-                    }
-                    if (event.text == Key.DownArrow) {
-                        root.move-cursor("down");
-                        return accept;
-                    }
-                    if (event.text == Key.LeftArrow) {
-                        root.move-cursor("left");
-                        return accept;
-                    }
-                    if (event.text == Key.RightArrow) {
-                        root.move-cursor("right");
-                        return accept;
-                    }
-                    if (event.text == Key.Home) {
-                        root.move-cursor("home");
-                        return accept;
-                    }
-                    if (event.text == Key.End) {
-                        root.move-cursor("end");
-                        return accept;
-                    }
-                    
-                    // Handle Ctrl+Z (Undo)
-                    if (event.text == "z" && event.modifiers.control) {
-                        root.undo();
-                        return accept;
-                    }
-                    
-                    // Handle Ctrl+Y (Redo)
-                    if (event.text == "y" && event.modifiers.control) {
-                        root.redo();
-                        return accept;
-                    }
-
-                    // Handle Ctrl+S (Save)
-                    if (event.text == "s" && event.modifiers.control) {
-                        root.save-file();
-                        return accept;
-                    }
-
-                    // Handle Ctrl+N (New)
-                    if (event.text == "n" && event.modifiers.control) {
-                        root.new-file();
-                        return accept;
-                    }
-
-                    // Regular text input
-                    if (event.text != "") {
-                        root.text-input(event.text);
-                        return accept;
-                    }
-
-                    return reject;
-                }
-            }
+        // Find bar
+        find-bar := FindBar {
+            visible: root.show-find-bar;
+            find-text: root.find-text;
+            replace-text: root.replace-text;
+            
+            find-text-changed(text) => { root.find-text-changed(text); }
+            replace-all(find, replace) => { root.replace-all(find, replace); }
+            close-find() => { root.close-find(); }
         }
 
         // Status bar
-        status-bar := Rectangle {
-            height: 30px;
-            background: #007acc;
+        status-bar := StatusBar {
+            cursor-line: root.cursor-line;
+            cursor-column: root.cursor-column;
+            is-modified: root.is-modified;
+            can-undo: root.can-undo;
+            can-redo: root.can-redo;
+        }
+    }
 
-            HorizontalBox {
-                padding: 6px;
-                spacing: 16px;
-
-                Text {
-                    text: "Phoenix Editor";
-                    color: #ffffff;
-                    font-size: 12px;
-                    vertical-alignment: center;
-                }
-
-                Rectangle { horizontal-stretch: 1; }
-
-                // Cursor position
-                Text {
-                    text: "Ln " + root.cursor-line + ", Col " + root.cursor-column;
-                    color: #ffffff;
-                    font-size: 12px;
-                    vertical-alignment: center;
-                }
-
-                // Undo/Redo indicators
-                if root.can-undo: Text {
-                    text: "↶";
-                    color: #ffffff;
-                    font-size: 14px;
-                    vertical-alignment: center;
-                }
-
-                if root.can-redo: Text {
-                    text: "↷";
-                    color: #ffffff;
-                    font-size: 14px;
-                    vertical-alignment: center;
-                }
-            }
+    // About dialog (popup overlay)
+    about-dialog := AboutDialog {
+        visible: root.show-about-dialog;
+        close => {
+            root.show-about-dialog = false;
         }
     }
 }

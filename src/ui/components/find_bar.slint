@@ -1,0 +1,72 @@
+// Find and Replace bar component
+
+import { Button } from "std-widgets.slint";
+
+export component FindBar {
+    in-out property <string> find-text: "";
+    in-out property <string> replace-text: "";
+    in-out property <bool> visible: false;
+    
+    callback find-text-changed(string);
+    callback replace-all(string, string);
+    callback close-find();
+    
+    if root.visible: Rectangle {
+        height: 40px;
+        background: #2d2d2d;
+        
+        HorizontalBox {
+            padding: 8px;
+            spacing: 12px;
+            
+            Text {
+                text: "Find:";
+                color: #d4d4d4;
+                vertical-alignment: center;
+            }
+            
+            TextInput {
+                width: 200px;
+                text: root.find-text;
+                input-type: text;
+                edited => {
+                    root.find-text = self.text;
+                    root.find-text-changed(self.text);
+                }
+            }
+            
+            Text {
+                text: "Replace:";
+                color: #d4d4d4;
+                vertical-alignment: center;
+            }
+            
+            TextInput {
+                width: 200px;
+                text: root.replace-text;
+                input-type: text;
+                edited => {
+                    root.replace-text = self.text;
+                }
+            }
+            
+            Button {
+                text: "Replace All";
+                clicked => {
+                    root.replace-all(root.find-text, root.replace-text);
+                }
+            }
+            
+            Rectangle { horizontal-stretch: 1; }
+            
+            Button {
+                text: "✕";
+                width: 30px;
+                clicked => {
+                    root.visible = false;
+                    root.close-find();
+                }
+            }
+        }
+    }
+}

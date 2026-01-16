@@ -1,0 +1,47 @@
+// Status bar component
+
+export component StatusBar {
+    in-out property <int> cursor-line: 1;
+    in-out property <int> cursor-column: 1;
+    in-out property <bool> is-modified: false;
+    in-out property <bool> can-undo: false;
+    in-out property <bool> can-redo: false;
+    
+    height: 30px;
+    background: #007acc;
+
+    HorizontalBox {
+        padding: 6px;
+        spacing: 16px;
+
+        Text {
+            text: "Shinku Editor";
+            color: #ffffff;
+            font-size: 12px;
+            vertical-alignment: center;
+        }
+
+        Rectangle { horizontal-stretch: 1; }
+
+        Text {
+            text: "Ln " + root.cursor-line + ", Col " + root.cursor-column;
+            color: #ffffff;
+            font-size: 12px;
+            vertical-alignment: center;
+        }
+
+        if root.can-undo: Text {
+            text: "↶";
+            color: #ffffff;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+
+        if root.can-redo: Text {
+            text: "↷";
+            color: #ffffff;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+    }
+}
