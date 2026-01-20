@@ -2,7 +2,7 @@
   "app": {
     "name": "Shinku Editor",
     "version": "0.1.0",
-    "author": "Alaa",
+    "author": "Alaa Mekkaoui",
     "description": "A modern, lightweight text editor written in Rust",
     "license": "MIT",
     "website": "https://github.com/alaaeddinemekkaoui/shinku",

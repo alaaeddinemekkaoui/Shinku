@@ -1,84 +1,31 @@
 {
-  "shortcuts": [
-    {
-      "action": "New File",
-      "keys": "Ctrl+N",
-      "description": "Create a new blank document"
-    },
-    {
-      "action": "Open File",
-      "keys": "Ctrl+O",
-      "description": "Open an existing file"
-    },
-    {
-      "action": "Save File",
-      "keys": "Ctrl+S",
-      "description": "Save the current document"
-    },
-    {
-      "action": "Save As",
-      "keys": "Ctrl+Shift+S",
-      "description": "Save the document with a new name"
-    },
-    {
-      "action": "Undo",
-      "keys": "Ctrl+Z",
-      "description": "Undo the last action"
-    },
-    {
-      "action": "Redo",
-      "keys": "Ctrl+Y",
-      "description": "Redo the last undone action"
-    },
-    {
-      "action": "Find & Replace",
-      "keys": "Ctrl+F",
-      "description": "Open find and replace dialog"
-    },
-    {
-      "action": "Go to Line Start",
-      "keys": "Home",
-      "description": "Move cursor to start of line"
-    },
-    {
-      "action": "Go to Line End",
-      "keys": "End",
-      "description": "Move cursor to end of line"
-    },
-    {
-      "action": "Navigate Up",
-      "keys": "Up Arrow",
-      "description": "Move cursor up one line"
-    },
-    {
-      "action": "Navigate Down",
-      "keys": "Down Arrow",
-      "description": "Move cursor down one line"
-    },
-    {
-      "action": "Navigate Left",
-      "keys": "Left Arrow",
-      "description": "Move cursor left one character"
-    },
-    {
-      "action": "Navigate Right",
-      "keys": "Right Arrow",
-      "description": "Move cursor right one character"
-    },
-    {
-      "action": "Delete Character",
-      "keys": "Backspace",
-      "description": "Delete character before cursor"
-    },
-    {
-      "action": "Delete Next",
-      "keys": "Delete",
-      "description": "Delete character after cursor"
-    },
-    {
-      "action": "New Line",
-      "keys": "Return/Enter",
-      "description": "Insert a new line"
-    }
+  "file": [
+    { "action": "New File", "shortcut": "Ctrl+N" },
+    { "action": "Open File", "shortcut": "Ctrl+O" },
+    { "action": "Open Folder", "shortcut": "Ctrl+Shift+O" },
+    { "action": "Save", "shortcut": "Ctrl+S" },
+    { "action": "Save As", "shortcut": "Ctrl+Shift+S" },
+    { "action": "Close File", "shortcut": "Ctrl+W" },
+    { "action": "Close Folder", "shortcut": "Ctrl+Shift+W" }
+  ],
+  "edit": [
+    { "action": "Undo", "shortcut": "Ctrl+Z" },
+    { "action": "Redo", "shortcut": "Ctrl+Y" },
+    { "action": "Cut", "shortcut": "Ctrl+X" },
+    { "action": "Copy", "shortcut": "Ctrl+C" },
+    { "action": "Paste", "shortcut": "Ctrl+V" },
+    { "action": "Find", "shortcut": "Ctrl+F" },
+    { "action": "Replace", "shortcut": "Ctrl+H" },
+    { "action": "Select All", "shortcut": "Ctrl+A" }
+  ],
+  "view": [
+    { "action": "Toggle Line Numbers", "shortcut": "Ctrl+L" },
+    { "action": "Zoom In", "shortcut": "Ctrl+=" },
+    { "action": "Zoom Out", "shortcut": "Ctrl+-" },
+    { "action": "Reset Zoom", "shortcut": "Ctrl+0" }
+  ],
+  "general": [
+    { "action": "Command Palette", "shortcut": "Ctrl+Shift+P" },
+    { "action": "Settings", "shortcut": "Ctrl+," }
   ]
 }

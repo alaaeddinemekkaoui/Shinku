@@ -1,0 +1,32 @@
+{
+  "app": {
+    "name": "Shinku Editor",
+    "version": "0.1.0",
+    "description": "A modern, lightweight text editor built with Tauri and Rust",
+    "author": "Alaa",
+    "license": "MIT",
+    "repository": "https://github.com/yourusername/shinku",
+    "about": [
+      "Shinku (深紅) - meaning 'crimson' or 'deep red' in Japanese.",
+      "",
+      "A modern, high-performance text editor built from the ground up with:",
+      "• Rust backend for blazing-fast file operations",
+      "• Tauri framework for native performance",
+      "• React + CodeMirror for smooth editing experience",
+      "• Ropey text buffer for efficient text manipulation",
+      "",
+      "Philosophy:",
+      "From the ashes of complexity, rises simplicity.",
+      "",
+      "Features:",
+      "✓ Fast startup time (<200ms)",
+      "✓ Efficient memory usage",
+      "✓ Syntax highlighting for multiple languages",
+      "✓ Line numbers and cursor tracking",
+      "✓ Native file dialogs",
+      "✓ Modern dark theme",
+      "",
+      "Built with ❤️ by Alaa"
+    ]
+  }
+}

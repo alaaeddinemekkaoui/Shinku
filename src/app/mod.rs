@@ -6,6 +6,8 @@
 pub mod state;
 pub mod commands;
 pub mod controller;
+pub mod app_info;
 
 pub use controller::AppController;
 pub use state::AppState;
+pub use app_info::AppInfo;

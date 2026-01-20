@@ -8,3 +8,11 @@ Cargo.lock
 *.swp
 *.swo
 *~
+
+# Frontend
+node_modules/
+dist/
+*.local
+
+# Tauri
+src-tauri/target/

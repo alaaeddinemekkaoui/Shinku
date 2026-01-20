@@ -3,15 +3,17 @@ name = "shinku"
 version = "0.1.0"
 edition = "2021"
 authors = ["Alaa"]
-description = "Shinku - A modern, lightweight, native text editor written in Rust"
+description = "Shinku - A modern, lightweight text editor built with Tauri"
 license = "MIT"
 
 [dependencies]
 # Core text buffer - rope data structure for efficient text manipulation
 ropey = "1.6"
 
-# UI framework - modern, native, declarative UI
-slint = "1.8"
+# Tauri framework
+tauri = { version = "1.7", features = ["dialog-open", "dialog-save", "fs-read-file", "fs-write-file"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Error handling
 anyhow = "1.0"
@@ -20,10 +22,9 @@ thiserror = "1.0"
 # Logging
 log = "0.4"
 env_logger = "0.11"
-rfd = "0.17.2"
 
 [build-dependencies]
-slint-build = "1.8"
+tauri-build = { version = "1.5", features = [] }
 
 [profile.release]
 opt-level = 3

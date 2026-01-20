@@ -28,31 +28,45 @@
 mod core;
 mod app;
 mod platform;
-mod ui;
+mod tauri_commands;
 
-use ui::PhoenixUI;
+use tauri_commands::AppState;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     // Initialize logging
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or("info")
     ).init();
 
     log::info!("╔═══════════════════════════════════════╗");
-    log::info!("║      PROJECT PHOENIX TEXT EDITOR      ║");
+    log::info!("║      SHINKU TEXT EDITOR (TAURI)       ║");
     log::info!("║   From the ashes, rises simplicity    ║");
     log::info!("╚═══════════════════════════════════════╝");
     log::info!("");
-    log::info!("Version: 0.1.0 (Phase 1 - Foundations)");
-    log::info!("Built with: Rust + Slint");
+    log::info!("Version: 0.1.0 (Tauri Edition)");
+    log::info!("Built with: Rust + Tauri + React + Vite");
     log::info!("");
 
-    // Create and run the UI
-    let ui = PhoenixUI::new()?;
-    ui.run()?;
+    tauri::Builder::default()
+        .manage(AppState::default())
+        .invoke_handler(tauri::generate_handler![
+            tauri_commands::get_content,
+            tauri_commands::set_content,
+            tauri_commands::get_editor_state,
+            tauri_commands::new_file,
+            tauri_commands::open_file,
+            tauri_commands::save_file,
+            tauri_commands::save_file_as,
+            tauri_commands::insert_text,
+            tauri_commands::open_folder,
+            tauri_commands::undo,
+            tauri_commands::redo,
+            tauri_commands::get_app_info,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 
-    log::info!("Phoenix editor shutting down");
-    Ok(())
+    log::info!("Shinku editor shutting down");
 }
 
 // ============================================================================

@@ -1,53 +1,136 @@
-# 🔥 Project Phoenix
+# Shinku Text Editor
 
-**Version:** 0.1 *(Yes, it's 0.1 — why not!)*
+A modern, high-performance text editor built with Rust, Tauri, React, and CodeMirror.
 
-## What is Project Phoenix?
-A text editor written in Rust. Name inspired by Final Fantasy and Zelda (might change later when it hits version 1).
+## Quick Start
 
-## Why?
-- It's a fun project to work on
-- Because it's Rust… and Rust is cool
-- Learning by doing something meaningful
+### 🚀 Fastest Way to Run (Recommended)
 
-## What's the purpose?
-- Learn Rust while building something fun
-- Create a fast, native text editor
-- Have some fun along the way
+**Windows:**
+```powershell
+.\run.bat
+```
 
-## Current Status
-**Phase 2 complete!** ✅ File dialogs, line numbers, find/replace, and improved scrolling working.
+**macOS/Linux:**
+```bash
+chmod +x run.sh
+./run.sh
+```
 
-## 🏗️ How it's Built
+### 📦 Using npm Commands
 
-**Tech Stack:**
-- Language: Rust (obviously)
-- UI: Slint (native, not Electron!)
-- Text Buffer: Rope data structure (ropey crate)
+```bash
+npm start
+```
 
+Or the full command:
+```bash
+npm run tauri dev
+```
 
-## 🚀 Building and Running
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | **Best**: Start Tauri dev server |
+| `npm run tauri dev` | Start Tauri development |
+| `cargo build` | Build Rust backend |
+| `cargo run` | Run Rust backend only |
+
+## Features
+
+The boring nerdy stuff (My Deep Apologies  )
+✨ **Modern Editor**
+- Syntax highlighting (JavaScript, Python, Rust, etc.)
+- CodeMirror 6 integration with line numbers
+- Full-screen scrollable editor
+- Efficient rope-based text buffer
+
+📁 **File Operations**
+- New File (Ctrl+N)
+- Open File (Ctrl+O)
+- Open Folder (Ctrl+Shift+O)
+- Save (Ctrl+S)
+- Save As (Ctrl+Shift+S)
+- Close File (Ctrl+W)
+
+⌨️ **Keyboard Shortcuts**
+- Full menu with dropdown shortcuts
+- About menu with complete shortcut reference
+- Edit: Undo, Redo, Cut, Copy, Paste, Find, Replace
+- View: Zoom, Line Numbers, Toggle
+
+🎨 **Modern UI**
+- Dark theme (OneDark)
+- Dropdown menus with icon support
+- Modal dialogs for About & Shortcuts
+- Real-time cursor position display
+
+## Project Structure
+The boring nerdy stuff 
+```
+Project phoenix/
+├── src/                   # Rust backend
+│   ├── main.rs           # Main entry point
+│   ├── tauri_commands.rs # Tauri command handlers
+│   ├── core/             # Text editor core
+│   ├── app/              # Application controller
+│   └── platform/         # File I/O
+├── src/ (frontend)       # React + TypeScript
+│   ├── components/       # React components
+│   ├── App.tsx          # Main app
+│   └── styles.css       # Global styles
+├── config/               # Configuration
+│   ├── shortcuts.json   # Keyboard shortcuts
+│   └── about.json       # About information
+├── package.json          # npm dependencies
+├── Cargo.toml           # Rust dependencies
+└── tauri.conf.json      # Tauri config
+```
+
+## Tech Stack
+
+- **Backend:** Rust + Tauri
+- **Frontend:** React + TypeScript + Vite
+- **Editor:** CodeMirror 6
+- **Text Buffer:** Ropey (rope data structure)
+- **Theme:** OneDark
+
+## Development
 
 ### Prerequisites
+- Node.js 16+
+- Rust 1.70+
 
-- **Rust**: 1.70 or later
-- **Cargo**: Included with Rust
-
-### Build
-
+### Installation
 ```bash
-cargo build --release
+npm install
 ```
 
-### Run
-
+### Development Mode
 ```bash
-cargo run --release
+npm start
 ```
 
-The core editor logic has tests. UI stuff is tested manually for now.
+This starts both the Vite dev server and Tauri in development mode with hot reload.
 
-## 📝 License
+## Building for Release
+
+```bash
+npm run build
+```
+
+## License
+
+MIT - See LICENSE file
+
+## Author
+
+**Alaa** - Built with ❤️ using Rust + Tauri + React + CodeMirror
+
+---
+
+**Philosophy:** From the ashes of complexity, rises simplicity. ✨
 
 MIT - Do whatever you want with it
 
@@ -56,10 +139,3 @@ MIT - Do whatever you want with it
 - **ropey** - Text buffer library
 - **Slint** - UI framework
 - **Final Fantasy & Zelda** - Name inspiration ⚔️🔥
-
----
-
-**Status:** Phase 2 Complete ✅ (v0.1) - Production ready for basic text editing!  
-**Language:** 100% Rust  
-**Fun level:** High 🔥  
-**Next Phase**: Phase 3 - UI Polish & Settings (estimated 4-6 weeks)

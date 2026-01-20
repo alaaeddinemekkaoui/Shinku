@@ -14,7 +14,7 @@ use crate::core::buffer::TextBuffer;
 use crate::core::types::{Position, CoreResult};
 
 /// A command that can be executed and undone
-pub trait Command: std::fmt::Debug {
+pub trait Command: std::fmt::Debug + Send + Sync {
     /// Execute the command, modifying the buffer
     fn execute(&mut self, buffer: &mut TextBuffer) -> CoreResult<()>;
     
