@@ -28,7 +28,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
   onPreferences
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [hoverMenu, setHoverMenu] = useState<string | null>(null);
+  const [_hoverMenu, setHoverMenu] = useState<string | null>(null);
 
   const toggleMenu = (menu: string) => {
     setActiveMenu(activeMenu === menu ? null : menu);

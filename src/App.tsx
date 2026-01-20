@@ -14,6 +14,7 @@ interface EditorState {
   content: string;
   title: string;
   is_modified: boolean;
+  is_saved: boolean;  // Track if file is persisted to disk (from backend)
   line_count: number;
   cursor_line: number;
   cursor_column: number;
@@ -25,6 +26,11 @@ interface DirectoryEntry {
   entry_type: string;
   path: string;
   children?: DirectoryEntry[];
+}
+
+interface FolderTreeResponse {
+  folder_path: string;
+  entries: DirectoryEntry[];
 }
 
 /**
@@ -45,6 +51,7 @@ function App() {
     content: "",
     title: "Untitled",
     is_modified: false,
+    is_saved: true,  // New documents start as saved (clean state)
     line_count: 1,
     cursor_line: 1,
     cursor_column: 1,
@@ -60,6 +67,7 @@ function App() {
   const [fileContents, setFileContents] = useState<Record<string, EditorState>>({});
   const [folderTree, setFolderTree] = useState<TreeNode[]>([]);
   const [showFileTree, setShowFileTree] = useState(false);
+  const [currentFolderPath, setCurrentFolderPath] = useState<string>("");
 
   // Fetch initial editor state
   useEffect(() => {
@@ -74,23 +82,29 @@ function App() {
       ...prev,
       content,
       is_modified: true,
-      line_count: content.split("\n").length,
+      is_saved: false,  // Mark as unsaved in local state
     }));
 
     // Update file contents for active file
     if (activeFileId) {
+      setOpenFiles(prev => prev.map(f => 
+        f.id === activeFileId 
+          ? { ...f, isModified: true, isSaved: false }
+          : f
+      ));
       setFileContents(prev => ({
         ...prev,
         [activeFileId]: {
           ...prev[activeFileId],
           content,
           is_modified: true,
+          is_saved: false,
           line_count: content.split("\n").length,
         }
       }));
     }
 
-    // Sync to backend
+    // Sync to backend - backend will mark as modified
     invoke("set_content", { content }).catch(console.error);
   }, [activeFileId]);
 
@@ -108,7 +122,8 @@ function App() {
         name: state.title,
         path: state.title,
         isActive: true,
-        isDirty: false
+        isModified: false,
+        isSaved: true
       };
       setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
       setFileContents(prev => ({ ...prev, [fileId]: state }));
@@ -118,9 +133,92 @@ function App() {
     }
   }, []);
 
+  const handleSaveFile = useCallback(async () => {
+    try {
+      const state = await invoke<EditorState>("save_file");
+      setEditorState(state);
+      if (activeFileId) {
+        setOpenFiles(prev => prev.map(f =>
+          f.id === activeFileId
+            ? { ...f, isModified: false, isSaved: true }
+            : f
+        ));
+      }
+    } catch (error) {
+      console.error("Failed to save file:", error);
+    }
+  }, [activeFileId]);
+
+  const handleOpenFileFromPath = useCallback(async (filePath: string, fileName: string) => {
+    // Check if active file has unsaved changes
+    if (activeFileId) {
+      const activeFile = openFiles.find(f => f.id === activeFileId);
+      if (activeFile?.isModified) {
+        const shouldSave = window.confirm(
+          `Save changes to "${activeFile.name}" before opening another file?`
+        );
+        if (shouldSave) {
+          await handleSaveFile();
+        }
+      }
+    }
+
+    try {
+      // Call backend to open file - but we need to store the file path in the backend
+      const state = await invoke<EditorState>("open_file_from_path", { filePath });
+      if (!state || !state.content === undefined) {
+        console.error("Failed to open file");
+        return;
+      }
+      
+      setEditorState(state);
+      const fileId = filePath;
+      const newFile: FileTab = {
+        id: fileId,
+        name: fileName,
+        path: filePath,
+        isActive: true,
+        isModified: false,
+        isSaved: true
+      };
+      
+      // Check if file already open
+      const existingFile = openFiles.find(f => f.id === fileId);
+      if (existingFile) {
+        setOpenFiles(prev => prev.map(f => ({ ...f, isActive: f.id === fileId })));
+        setActiveFileId(fileId);
+      } else {
+        setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
+        setFileContents(prev => ({ ...prev, [fileId]: state }));
+        setActiveFileId(fileId);
+      }
+    } catch (error) {
+      console.error("Failed to open file from path:", error);
+      alert("Failed to open file: " + error);
+    }
+  }, [openFiles, activeFileId, handleSaveFile]);
+
   const handleOpenFile = useCallback(async () => {
+    // Check if active file has unsaved changes
+    if (activeFileId) {
+      const activeFile = openFiles.find(f => f.id === activeFileId);
+      if (activeFile?.isModified) {
+        const shouldSave = window.confirm(
+          `Save changes to "${activeFile.name}" before opening another file?`
+        );
+        if (shouldSave) {
+          await handleSaveFile();
+        }
+      }
+    }
+
     try {
       const state = await invoke<EditorState>("open_file");
+      if (!state || !state.title) {
+        console.error("No file selected");
+        return;
+      }
+      
       setEditorState(state);
       const fileId = state.title; // Use title as unique identifier
       const newFile: FileTab = {
@@ -128,16 +226,16 @@ function App() {
         name: state.title.split('/').pop() || state.title,
         path: state.title,
         isActive: true,
-        isDirty: false
+        isModified: false,
+        isSaved: true
       };
+      
       // Check if file already open
       const existingFile = openFiles.find(f => f.id === fileId);
       if (existingFile) {
-        // Switch to existing file
         setOpenFiles(prev => prev.map(f => ({ ...f, isActive: f.id === fileId })));
         setActiveFileId(fileId);
       } else {
-        // Add new file
         setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
         setFileContents(prev => ({ ...prev, [fileId]: state }));
         setActiveFileId(fileId);
@@ -145,16 +243,7 @@ function App() {
     } catch (error) {
       console.error("Failed to open file:", error);
     }
-  }, [openFiles]);
-
-  const handleSaveFile = useCallback(async () => {
-    try {
-      const state = await invoke<EditorState>("save_file");
-      setEditorState(state);
-    } catch (error) {
-      console.error("Failed to save file:", error);
-    }
-  }, []);
+  }, [openFiles, activeFileId, handleSaveFile]);
 
   const handleSaveFileAs = useCallback(async () => {
     try {
@@ -192,7 +281,18 @@ function App() {
     }
   }, [fileContents]);
 
-  const handleCloseFile = useCallback((fileId: string) => {
+  const handleCloseFile = useCallback(async (fileId: string) => {
+    const fileToClose = openFiles.find(f => f.id === fileId);
+    
+    if (fileToClose?.isModified) {
+      const shouldSave = window.confirm(
+        `Save changes to "${fileToClose.name}" before closing?`
+      );
+      if (shouldSave) {
+        await handleSaveFile();
+      }
+    }
+
     const newFiles = openFiles.filter(f => f.id !== fileId);
     setOpenFiles(newFiles);
     
@@ -214,23 +314,55 @@ function App() {
           content: "",
           title: "Untitled",
           is_modified: false,
+          is_saved: true,
           line_count: 1,
           cursor_line: 1,
           cursor_column: 1,
         });
       }
     }
-  }, [openFiles, activeFileId, handleSelectFile]);
+  }, [openFiles, activeFileId, handleSaveFile, handleSelectFile]);
 
   const handleOpenFolder = useCallback(async () => {
     try {
-      const directoryEntries = await invoke<DirectoryEntry[]>('open_folder');
-      setFolderTree(convertToTreeNodes(directoryEntries));
+      const response = await invoke<FolderTreeResponse>('open_folder');
+      if (!response || !response.folder_path || response.entries.length === 0) {
+        console.error('No folder selected or folder is empty');
+        return;
+      }
+      setCurrentFolderPath(response.folder_path);
+      setFolderTree(convertToTreeNodes(response.entries));
       setShowFileTree(true);
     } catch (error) {
       console.error('Failed to open folder:', error);
     }
   }, []);
+
+  const refreshFolderTree = useCallback(async () => {
+    if (currentFolderPath) {
+      try {
+        const response = await invoke<FolderTreeResponse>('refresh_folder_tree');
+        setFolderTree(convertToTreeNodes(response.entries));
+      } catch (error) {
+        console.error('Failed to refresh folder:', error);
+      }
+    }
+  }, [currentFolderPath]);
+
+  // Check for unsaved changes before quitting
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasUnsavedFiles = openFiles.some(f => f.isModified);
+      if (hasUnsavedFiles) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [openFiles]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -369,36 +501,42 @@ function App() {
           {showFileTree && folderTree.length > 0 && (
             <FileTree
               nodes={folderTree}
-              folderPath={editorState.title}
+              folderPath={currentFolderPath}
               activeFilePath={activeFileId || undefined}
               onFileSelect={(node) => {
                 if (node.type === 'file') {
-                  const newFile: FileTab = {
-                    id: node.id,
-                    name: node.name,
-                    path: node.path,
-                    isActive: true,
-                    isDirty: false
-                  };
-                  // Check if file already open
-                  const existingFile = openFiles.find(f => f.id === node.id);
-                  if (existingFile) {
-                    handleSelectFile(node.id);
-                  } else {
-                    setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
-                    setFileContents(prev => ({ ...prev, [node.id]: editorState }));
-                    setActiveFileId(node.id);
-                  }
+                  // Call the handler to open file from specific path
+                  handleOpenFileFromPath(node.path, node.name);
                 }
               }}
               onContextMenu={(node, action) => {
                 handleFileTreeContextMenu(node, action);
               }}
-              onCreateFile={() => {
-                console.log('Create new file - not implemented yet');
+              onCreateFile={async (parentPath: string, fileName: string) => {
+                if (!fileName.trim() || !parentPath) return;
+                try {
+                  await invoke('create_file', { 
+                    parentPath, 
+                    fileName 
+                  });
+                  await refreshFolderTree();
+                } catch (error) {
+                  console.error('Failed to create file:', error);
+                  alert('Failed to create file: ' + error);
+                }
               }}
-              onCreateFolder={() => {
-                console.log('Create new folder - not implemented yet');
+              onCreateFolder={async (parentPath: string, folderName: string) => {
+                if (!folderName.trim() || !parentPath) return;
+                try {
+                  await invoke('create_folder', { 
+                    parentPath, 
+                    folderName 
+                  });
+                  await refreshFolderTree();
+                } catch (error) {
+                  console.error('Failed to create folder:', error);
+                  alert('Failed to create folder: ' + error);
+                }
               }}
             />
           )}

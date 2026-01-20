@@ -59,6 +59,8 @@ fn main() {
             tauri_commands::save_file_as,
             tauri_commands::insert_text,
             tauri_commands::open_folder,
+            tauri_commands::create_file,
+            tauri_commands::create_folder,
             tauri_commands::undo,
             tauri_commands::redo,
             tauri_commands::get_app_info,

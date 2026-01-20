@@ -84,6 +84,30 @@ impl AppController {
             .unwrap_or(false)
     }
 
+    /// Check if document is saved to disk
+    pub fn is_saved(&self) -> bool {
+        self.state
+            .active_document()
+            .map(|d| d.is_saved)
+            .unwrap_or(false)
+    }
+
+    /// Mark the active document as modified and not saved
+    pub fn mark_modified(&mut self) {
+        if let Some(doc) = self.state.active_document_mut() {
+            doc.is_modified = true;
+            doc.is_saved = false;
+        }
+    }
+
+    /// Mark the active document as saved
+    pub fn mark_saved(&mut self) {
+        if let Some(doc) = self.state.active_document_mut() {
+            doc.is_modified = false;
+            doc.is_saved = true;
+        }
+    }
+
     /// Check if undo is available
     pub fn can_undo(&self) -> bool {
         self.state
@@ -241,6 +265,25 @@ impl AppController {
     /// Get the current folder path
     pub fn current_folder(&self) -> Option<&PathBuf> {
         self.state.current_folder.as_ref()
+    }
+
+    /// Get the appropriate folder for creating new files/folders
+    /// Returns the open folder path, or the folder of the active file, or None
+    pub fn get_creation_folder(&self) -> Option<PathBuf> {
+        // First priority: use the open folder if one is set
+        if let Some(folder) = self.state.current_folder.as_ref() {
+            return Some(folder.clone());
+        }
+        
+        // Second priority: use the folder of the active file
+        if let Some(file_path) = self.state.file_path() {
+            if let Some(parent) = file_path.parent() {
+                return Some(parent.to_path_buf());
+            }
+        }
+        
+        // No folder available
+        None
     }
 
     /// Generate directory tree from a folder

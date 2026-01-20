@@ -6,6 +6,8 @@ export interface FileTab {
   path: string;
   isActive: boolean;
   isDirty?: boolean;
+  isSaved?: boolean;
+  isModified?: boolean;
 }
 
 interface FileSidebarProps {
@@ -29,7 +31,7 @@ const FileSidebar: React.FC<FileSidebarProps> = ({ files, onFileSelect, onFileCl
             onClick={() => onFileSelect(file.id)}
           >
             <span className="file-name">
-              {file.isDirty && <span className="dirty-indicator">●</span>}
+              {file.isModified && <span className="modified-indicator">●</span>}
               {file.name}
             </span>
             <button

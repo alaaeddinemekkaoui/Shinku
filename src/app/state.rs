@@ -20,6 +20,8 @@ pub struct Document {
     pub editor: Editor,
     pub file_path: Option<PathBuf>,
     pub title: String,
+    pub is_saved: bool,   // Track if file has been persisted to disk
+    pub is_modified: bool, // Track if content has changed since last save
 }
 
 impl Document {
@@ -30,6 +32,8 @@ impl Document {
             editor: Editor::new(),
             file_path: None,
             title: "Untitled".to_string(),
+            is_saved: true,      // New files start as "saved" (clean state)
+            is_modified: false,  // Not modified yet
         }
     }
 
@@ -46,6 +50,8 @@ impl Document {
             editor: Editor::with_content(&content),
             file_path: Some(path),
             title,
+            is_saved: true,      // File loaded from disk is saved
+            is_modified: false,  // Initial content is not modified
         }
     }
 

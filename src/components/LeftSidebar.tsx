@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import DropdownMenu from './DropdownMenu';
 import AboutDialog from './AboutDialog';
@@ -24,7 +24,6 @@ export default function LeftSidebar({
   onUndo,
   onRedo,
   onFindReplace,
-  fileName,
 }: LeftSidebarProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);

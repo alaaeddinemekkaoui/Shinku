@@ -17,8 +17,8 @@ interface FileTreeProps {
   onFileSelect: (node: TreeNode) => void;
   onFolderOpen?: (node: TreeNode) => void;
   onContextMenu?: (node: TreeNode, action: string) => void;
-  onCreateFile?: (parentPath?: string) => void;
-  onCreateFolder?: (parentPath?: string) => void;
+  onCreateFile?: (parentPath: string, fileName: string) => void;
+  onCreateFolder?: (parentPath: string, folderName: string) => void;
   activeFilePath?: string;
 }
 
@@ -40,6 +40,9 @@ const FileTree: React.FC<FileTreeProps> = ({
 }) => {
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [creatingFile, setCreatingFile] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [creatingName, setCreatingName] = useState("");
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Cache metadata when tree is rendered
@@ -101,6 +104,56 @@ const FileTree: React.FC<FileTreeProps> = ({
       onContextMenu(contextMenu.node, action);
     }
     setContextMenu(null);
+  };
+
+  const handleCreateFile = () => {
+    setCreatingFile(true);
+    setCreatingName("");
+  };
+
+  const handleCreateFolder = () => {
+    setCreatingFolder(true);
+    setCreatingName("");
+  };
+
+  const handleConfirmCreation = async (type: 'file' | 'folder') => {
+    if (!creatingName.trim()) return;
+
+    let parentPath = folderPath;
+    
+    // If no folder path is provided, get it from the backend (from open folder or active file)
+    if (!parentPath) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/tauri");
+        const result = await invoke<string | null>('get_creation_folder');
+        if (!result) {
+          alert('No folder path available. Please open a folder first or create a new file.');
+          handleCancelCreation();
+          return;
+        }
+        parentPath = result;
+      } catch (error) {
+        console.error('Failed to get creation folder:', error);
+        alert('Failed to determine where to create the file/folder');
+        handleCancelCreation();
+        return;
+      }
+    }
+
+    if (type === 'file') {
+      onCreateFile?.(parentPath, creatingName);
+    } else {
+      onCreateFolder?.(parentPath, creatingName);
+    }
+    setCreatingFile(false);
+    setCreatingFolder(false);
+    setCreatingName("");
+  };
+
+  const handleCancelCreation = () => {
+    setCreatingFile(false);
+    setCreatingFolder(false);
+    setCreatingName("");
   };
 
   // Close context menu when clicking elsewhere
@@ -171,19 +224,38 @@ const FileTree: React.FC<FileTreeProps> = ({
           <button 
             className="file-tree-action-btn" 
             title="New File"
-            onClick={() => onCreateFile?.()}
+            onClick={handleCreateFile}
           >
             +📄
           </button>
           <button 
             className="file-tree-action-btn" 
             title="New Folder"
-            onClick={() => onCreateFolder?.()}
+            onClick={handleCreateFolder}
           >
             +📁
           </button>
         </div>
       </div>
+      {(creatingFile || creatingFolder) && (
+        <div className="file-tree-create-input">
+          <input
+            autoFocus
+            type="text"
+            placeholder={creatingFile ? "file.ext" : "folder-name"}
+            value={creatingName}
+            onChange={(e) => setCreatingName(e.target.value)}
+            onKeyDown={async (e) => {
+              if (e.key === 'Enter') {
+                await handleConfirmCreation(creatingFile ? 'file' : 'folder');
+              } else if (e.key === 'Escape') {
+                handleCancelCreation();
+              }
+            }}
+            onBlur={handleCancelCreation}
+          />
+        </div>
+      )}
       <div className="file-tree">
         {nodes.length > 0 ? (
           nodes.map((node) => renderNode(node))
