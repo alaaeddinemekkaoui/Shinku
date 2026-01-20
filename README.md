@@ -1,6 +1,6 @@
-# Shinku Text Editor
+# Shinku 神紅 
 
-A modern, high-performance text editor built with Rust, Tauri, React, and CodeMirror.
+A modern, high-performance text editor built with Rust, , React, and CodeMirror.
 
 ## Quick Start
 
@@ -25,15 +25,15 @@ npm start
 
 Or the full command:
 ```bash
-npm run tauri dev
+npm run  dev
 ```
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | **Best**: Start Tauri dev server |
-| `npm run tauri dev` | Start Tauri development |
+| `npm start` | **Best**: Start  dev server |
+| `npm run  dev` | Start  development |
 | `cargo build` | Build Rust backend |
 | `cargo run` | Run Rust backend only |
 
@@ -72,7 +72,7 @@ The boring nerdy stuff
 Project phoenix/
 ├── src/                   # Rust backend
 │   ├── main.rs           # Main entry point
-│   ├── tauri_commands.rs # Tauri command handlers
+│   ├── _commands.rs #  command handlers
 │   ├── core/             # Text editor core
 │   ├── app/              # Application controller
 │   └── platform/         # File I/O
@@ -85,12 +85,12 @@ Project phoenix/
 │   └── about.json       # About information
 ├── package.json          # npm dependencies
 ├── Cargo.toml           # Rust dependencies
-└── tauri.conf.json      # Tauri config
+└── .conf.json      #  config
 ```
 
 ## Tech Stack
 
-- **Backend:** Rust + Tauri
+- **Backend:** Rust + 
 - **Frontend:** React + TypeScript + Vite
 - **Editor:** CodeMirror 6
 - **Text Buffer:** Ropey (rope data structure)
@@ -112,7 +112,7 @@ npm install
 npm start
 ```
 
-This starts both the Vite dev server and Tauri in development mode with hot reload.
+This starts both the Vite dev server and  in development mode with hot reload.
 
 ## Building for Release
 
@@ -126,7 +126,7 @@ MIT - See LICENSE file
 
 ## Author
 
-**Alaa** - Built with ❤️ using Rust + Tauri + React + CodeMirror
+**Alaa** - Built with ❤️ using Rust +  + React + CodeMirror
 
 ---
 

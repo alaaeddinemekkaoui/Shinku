@@ -1,10 +1,12 @@
 import React from "react";
+import { detectLanguage } from "../utils/languageDetector";
 
 interface StatusBarProps {
   line: number;
   column: number;
   lineCount: number;
   isModified: boolean;
+  filePath?: string;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -12,13 +14,21 @@ const StatusBar: React.FC<StatusBarProps> = ({
   column,
   lineCount,
   isModified,
+  filePath = "Untitled",
 }) => {
+  const language = detectLanguage(filePath);
+  
   return (
     <div className="status-bar">
       <div className="status-left">
         <span className="status-item">
-          <strong>Shinku Editor</strong>
+          <strong>Shinku 神紅 Editor</strong>
         </span>
+        {filePath !== "Untitled" && (
+          <span className="status-item">
+            {language.icon} {language.displayName}
+          </span>
+        )}
       </div>
       <div className="status-right">
         <span className="status-item">

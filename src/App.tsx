@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import Editor from "./components/Editor";
-import LeftSidebar from "./components/LeftSidebar";
+import MenuBar from "./components/MenuBar";
 import FileHeader from "./components/FileHeader";
 import StatusBar from "./components/StatusBar";
 import FindReplace from "./components/FindReplace";
+import AboutDialog from "./components/AboutDialog";
+import ShortcutsDialog from "./components/ShortcutsDialog";
+import FileSidebar, { FileTab } from "./components/FileSidebar";
+import FileTree, { TreeNode } from "./components/FileTree";
 
 interface EditorState {
   content: string;
@@ -13,6 +17,27 @@ interface EditorState {
   line_count: number;
   cursor_line: number;
   cursor_column: number;
+}
+
+interface DirectoryEntry {
+  id: string;
+  name: string;
+  entry_type: string;
+  path: string;
+  children?: DirectoryEntry[];
+}
+
+/**
+ * Convert DirectoryEntry (from Rust) to TreeNode (for UI)
+ */
+function convertToTreeNodes(entries: DirectoryEntry[]): TreeNode[] {
+  return entries.map(entry => ({
+    id: entry.id,
+    name: entry.name,
+    type: entry.entry_type === 'folder' ? 'folder' : 'file',
+    path: entry.path,
+    children: entry.children ? convertToTreeNodes(entry.children) : undefined,
+  }));
 }
 
 function App() {
@@ -27,6 +52,14 @@ function App() {
 
   const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
   const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
+  const [openFiles, setOpenFiles] = useState<FileTab[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [fileContents, setFileContents] = useState<Record<string, EditorState>>({});
+  const [folderTree, setFolderTree] = useState<TreeNode[]>([]);
+  const [showFileTree, setShowFileTree] = useState(false);
 
   // Fetch initial editor state
   useEffect(() => {
@@ -44,9 +77,22 @@ function App() {
       line_count: content.split("\n").length,
     }));
 
+    // Update file contents for active file
+    if (activeFileId) {
+      setFileContents(prev => ({
+        ...prev,
+        [activeFileId]: {
+          ...prev[activeFileId],
+          content,
+          is_modified: true,
+          line_count: content.split("\n").length,
+        }
+      }));
+    }
+
     // Sync to backend
     invoke("set_content", { content }).catch(console.error);
-  }, []);
+  }, [activeFileId]);
 
   const handleCursorChange = useCallback((line: number, column: number) => {
     setCursorPos({ line, column });
@@ -56,6 +102,17 @@ function App() {
     try {
       const state = await invoke<EditorState>("new_file");
       setEditorState(state);
+      const fileId = `untitled-${Date.now()}`;
+      const newFile: FileTab = {
+        id: fileId,
+        name: state.title,
+        path: state.title,
+        isActive: true,
+        isDirty: false
+      };
+      setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
+      setFileContents(prev => ({ ...prev, [fileId]: state }));
+      setActiveFileId(fileId);
     } catch (error) {
       console.error("Failed to create new file:", error);
     }
@@ -65,10 +122,30 @@ function App() {
     try {
       const state = await invoke<EditorState>("open_file");
       setEditorState(state);
+      const fileId = state.title; // Use title as unique identifier
+      const newFile: FileTab = {
+        id: fileId,
+        name: state.title.split('/').pop() || state.title,
+        path: state.title,
+        isActive: true,
+        isDirty: false
+      };
+      // Check if file already open
+      const existingFile = openFiles.find(f => f.id === fileId);
+      if (existingFile) {
+        // Switch to existing file
+        setOpenFiles(prev => prev.map(f => ({ ...f, isActive: f.id === fileId })));
+        setActiveFileId(fileId);
+      } else {
+        // Add new file
+        setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
+        setFileContents(prev => ({ ...prev, [fileId]: state }));
+        setActiveFileId(fileId);
+      }
     } catch (error) {
       console.error("Failed to open file:", error);
     }
-  }, []);
+  }, [openFiles]);
 
   const handleSaveFile = useCallback(async () => {
     try {
@@ -106,6 +183,55 @@ function App() {
     }
   }, []);
 
+  const handleSelectFile = useCallback((fileId: string) => {
+    setActiveFileId(fileId);
+    setOpenFiles(prev => prev.map(f => ({ ...f, isActive: f.id === fileId })));
+    const fileContent = fileContents[fileId];
+    if (fileContent) {
+      setEditorState(fileContent);
+    }
+  }, [fileContents]);
+
+  const handleCloseFile = useCallback((fileId: string) => {
+    const newFiles = openFiles.filter(f => f.id !== fileId);
+    setOpenFiles(newFiles);
+    
+    // Remove from file contents
+    setFileContents(prev => {
+      const newContents = { ...prev };
+      delete newContents[fileId];
+      return newContents;
+    });
+
+    // Switch to another file if this was active
+    if (activeFileId === fileId) {
+      if (newFiles.length > 0) {
+        const nextFile = newFiles[newFiles.length - 1];
+        handleSelectFile(nextFile.id);
+      } else {
+        setActiveFileId(null);
+        setEditorState({
+          content: "",
+          title: "Untitled",
+          is_modified: false,
+          line_count: 1,
+          cursor_line: 1,
+          cursor_column: 1,
+        });
+      }
+    }
+  }, [openFiles, activeFileId, handleSelectFile]);
+
+  const handleOpenFolder = useCallback(async () => {
+    try {
+      const directoryEntries = await invoke<DirectoryEntry[]>('open_folder');
+      setFolderTree(convertToTreeNodes(directoryEntries));
+      setShowFileTree(true);
+    } catch (error) {
+      console.error('Failed to open folder:', error);
+    }
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -139,56 +265,190 @@ function App() {
         e.preventDefault();
         handleRedo();
       }
-      // Ctrl+H - Find & Replace
-      else if (e.ctrlKey && e.key === 'h') {
+      // Ctrl+F - Find & Replace
+      else if (e.ctrlKey && e.key === 'f') {
         e.preventDefault();
         setShowFindReplace(true);
       }
-      // Escape - Close Find & Replace
+      // Ctrl+, - Preferences
+      else if (e.ctrlKey && e.key === ',') {
+        e.preventDefault();
+        setShowPreferences(true);
+      }
+      // Escape - Close dialogs
       else if (e.key === 'Escape') {
         setShowFindReplace(false);
+        setShowAbout(false);
+        setShowShortcuts(false);
+        setShowPreferences(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo]);
+  }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo, handleSelectFile, handleCloseFile]);
+
+  const handleFileTreeContextMenu = useCallback((node: TreeNode, action: string) => {
+    switch (action) {
+      case 'open':
+        if (node.type === 'file') {
+          // Open file in new tab
+          const newFile: FileTab = {
+            id: node.id,
+            name: node.name,
+            path: node.path,
+            isActive: true,
+            isDirty: false
+          };
+          const existingFile = openFiles.find(f => f.id === node.id);
+          if (existingFile) {
+            handleSelectFile(node.id);
+          } else {
+            setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
+            setFileContents(prev => ({ ...prev, [node.id]: editorState }));
+            setActiveFileId(node.id);
+          }
+        }
+        break;
+      case 'reveal':
+        // Reveal in file explorer (platform-specific)
+        invoke('reveal_in_explorer', { path: node.path })
+          .catch(err => console.error('Failed to reveal in explorer:', err));
+        break;
+      case 'copy-path':
+        // Copy file path to clipboard
+        navigator.clipboard.writeText(node.path)
+          .catch(err => console.error('Failed to copy path:', err));
+        break;
+      case 'rename':
+        console.log('Rename not implemented yet:', node.name);
+        break;
+      case 'delete':
+        if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
+          invoke('delete_file_or_folder', { path: node.path })
+            .then(() => {
+              // Refresh folder tree
+              handleOpenFolder();
+            })
+            .catch(err => console.error('Failed to delete:', err));
+        }
+        break;
+      case 'new-file':
+        console.log('New file in folder not implemented yet');
+        break;
+      case 'new-folder':
+        console.log('New folder not implemented yet');
+        break;
+    }
+  }, [openFiles, activeFileId, editorState, handleSelectFile, handleOpenFolder]);
 
   return (
     <div className="app">
-      <LeftSidebar
-        onNewFile={handleNewFile}
-        onOpenFile={handleOpenFile}
-        onSaveFile={handleSaveFile}
-        onSaveFileAs={handleSaveFileAs}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onFindReplace={() => setShowFindReplace(true)}
-        fileName={editorState.title}
-      />
       <div className="main-content">
-        <FileHeader
-          title={editorState.title}
-          isModified={editorState.is_modified}
+        <MenuBar
+          onNew={handleNewFile}
+          onOpen={handleOpenFile}
+          onSave={handleSaveFile}
+          onSaveAs={handleSaveFileAs}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onFindReplace={() => setShowFindReplace(true)}
+          onAbout={() => setShowAbout(true)}
+          onShortcuts={() => setShowShortcuts(true)}
+          onOpenFolder={handleOpenFolder}
+          onPreferences={() => setShowPreferences(true)}
         />
-        <div className="editor-container">
-          <Editor
-            content={editorState.content}
-            onChange={handleContentChange}
-            onCursorChange={handleCursorChange}
+        {openFiles.length > 0 && (
+          <FileSidebar
+            files={openFiles}
+            onFileSelect={handleSelectFile}
+            onFileClose={handleCloseFile}
           />
+        )}
+        <div className="editor-wrapper">
+          {showFileTree && folderTree.length > 0 && (
+            <FileTree
+              nodes={folderTree}
+              folderPath={editorState.title}
+              activeFilePath={activeFileId || undefined}
+              onFileSelect={(node) => {
+                if (node.type === 'file') {
+                  const newFile: FileTab = {
+                    id: node.id,
+                    name: node.name,
+                    path: node.path,
+                    isActive: true,
+                    isDirty: false
+                  };
+                  // Check if file already open
+                  const existingFile = openFiles.find(f => f.id === node.id);
+                  if (existingFile) {
+                    handleSelectFile(node.id);
+                  } else {
+                    setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
+                    setFileContents(prev => ({ ...prev, [node.id]: editorState }));
+                    setActiveFileId(node.id);
+                  }
+                }
+              }}
+              onContextMenu={(node, action) => {
+                handleFileTreeContextMenu(node, action);
+              }}
+              onCreateFile={() => {
+                console.log('Create new file - not implemented yet');
+              }}
+              onCreateFolder={() => {
+                console.log('Create new folder - not implemented yet');
+              }}
+            />
+          )}
+          <div className="editor-container">
+            <FileHeader
+              title={editorState.title}
+              isModified={editorState.is_modified}
+            />
+            <Editor
+              content={editorState.content}
+              onChange={handleContentChange}
+              onCursorChange={handleCursorChange}
+            />
+            <StatusBar
+              line={cursorPos.line}
+              column={cursorPos.column}
+              lineCount={editorState.line_count}
+              isModified={editorState.is_modified}
+              filePath={editorState.title}
+            />
+          </div>
         </div>
-        <StatusBar
-          line={cursorPos.line}
-          column={cursorPos.column}
-          lineCount={editorState.line_count}
-          isModified={editorState.is_modified}
-        />
       </div>
       <FindReplace 
         isOpen={showFindReplace} 
         onClose={() => setShowFindReplace(false)} 
       />
+      <AboutDialog
+        isOpen={showAbout}
+        onClose={() => setShowAbout(false)}
+      />
+      <ShortcutsDialog
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
+      {showPreferences && (
+        <div className="preferences-overlay">
+          <div className="preferences-dialog">
+            <div className="preferences-header">
+              <h2>Preferences</h2>
+              <button className="close-btn" onClick={() => setShowPreferences(false)}>×</button>
+            </div>
+            <div className="preferences-content">
+              <h3>Theme</h3>
+              <p>Theme settings coming soon...</p>
+            </div>
+          </div>
+        </div>
+      )}
+```
     </div>
   );
 }

@@ -1,10 +1,10 @@
 @echo off
-REM Shinku Text Editor - Quick Start Script
+REM Shinku 神紅 Text Editor - Quick Start Script
 REM Starts the development server for Tauri app
 
 echo.
 echo ╔════════════════════════════════════════╗
-echo ║     SHINKU EDITOR - Starting App...    ║
+echo ║   SHINKU 神紅 EDITOR - Starting App...  ║
 echo ╚════════════════════════════════════════╝
 echo.
 

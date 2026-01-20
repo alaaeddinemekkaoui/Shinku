@@ -1,0 +1,250 @@
+/* File Tree Explorer */
+.file-tree-container {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 100vh;
+  background-color: #252526;
+  border-right: 1px solid #3e3e42;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.file-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px;
+  border-bottom: 1px solid #3e3e42;
+  background-color: #1e1e1e;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.file-tree-folder-name {
+  flex: 1;
+  color: #cccccc;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tree-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.file-tree-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background-color: transparent;
+  color: #cccccc;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.file-tree-action-btn:hover {
+  background-color: #464647;
+  color: #ffffff;
+}
+
+.file-tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+}
+
+.file-tree::-webkit-scrollbar {
+  width: 10px;
+}
+
+.file-tree::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-tree::-webkit-scrollbar-thumb {
+  background: #464647;
+  border-radius: 4px;
+}
+
+.file-tree::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+.tree-empty {
+  color: #6a6a6a;
+  font-size: 13px;
+  padding: 16px;
+  text-align: center;
+  user-select: none;
+}
+
+.tree-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  color: #cccccc;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s ease;
+  white-space: nowrap;
+  gap: 4px;
+}
+
+.tree-item:hover {
+  background-color: #2d2d30;
+}
+
+.tree-item.active {
+  background-color: #094771;
+  color: #ffffff;
+}
+
+.tree-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #6a6a6a;
+  transition: color 0.1s ease;
+}
+
+.tree-icon.invisible {
+  opacity: 0;
+}
+
+.tree-item:hover .tree-icon {
+  color: #cccccc;
+}
+
+.folder-icon,
+.file-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.tree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Context Menu */
+.context-menu {
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  min-width: 180px;
+  padding: 4px 0;
+  animation: slideIn 0.1s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.context-menu-item {
+  height: 24px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  color: #cccccc;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #2d2d30;
+  color: #ffffff;
+}
+
+.context-menu-item:active {
+  background-color: #0e639c;
+  color: #ffffff;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background-color: #3e3e42;
+  border: none;
+  margin: 4px 0;
+}
+
+/* Scrollbar styling for better integration */
+.file-tree {
+  scrollbar-color: #464647 transparent;
+  scrollbar-width: thin;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .file-tree-container {
+    width: 250px;
+  }
+
+  .tree-item {
+    height: 20px;
+    padding: 0 6px;
+  }
+
+  .folder-icon,
+  .file-icon {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 768px) {
+  .file-tree-container {
+    width: 200px;
+  }
+
+  .tree-item {
+    font-size: 12px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .file-tree-container {
+    display: none;
+  }
+}

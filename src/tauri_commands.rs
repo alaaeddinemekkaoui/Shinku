@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
+use std::path::PathBuf;
 
 use crate::app::{AppController, app_info};
 
@@ -118,18 +119,86 @@ pub async fn save_file_as(state: State<'_, AppState>) -> Result<EditorState, Str
 }
 
 #[tauri::command]
-pub async fn open_folder(state: State<'_, AppState>) -> Result<EditorState, String> {
+pub async fn open_folder(state: State<'_, AppState>) -> Result<Vec<crate::app::controller::DirectoryEntry>, String> {
     use tauri::api::dialog::blocking::FileDialogBuilder;
     
     let folder_path = FileDialogBuilder::new()
         .pick_folder();
     
-    if let Some(_path) = folder_path {
-        // For now, just return current state
-        // TODO: Implement folder browsing functionality
+    if let Some(path) = folder_path {
+        let mut controller = state.controller.lock().map_err(|e| e.to_string())?;
+        controller.set_current_folder(path.clone());
+        
+        // Generate directory tree
+        let tree = controller.get_directory_tree(&path)
+            .map_err(|e| e.to_string())?;
+        
+        return Ok(tree);
     }
     
+    Ok(Vec::new())
+}
+
+#[tauri::command]
+pub fn set_active_document(id: String, state: State<AppState>) -> Result<EditorState, String> {
+    let mut controller = state.controller.lock().map_err(|e| e.to_string())?;
+    controller.set_active_document(id);
+    drop(controller);
     get_editor_state(state)
+}
+
+#[tauri::command]
+pub fn get_open_documents(state: State<AppState>) -> Result<Vec<(String, String)>, String> {
+    let controller = state.controller.lock().map_err(|e| e.to_string())?;
+    let ids = controller.open_document_ids();
+    // Return list of (id, title) pairs
+    Ok(ids.iter().map(|id| (id.clone(), id.clone())).collect())
+}
+
+#[tauri::command]
+pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
+    use std::process::Command;
+    
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .args(&["/select,", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to open explorer: {}", e))?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(&["-R", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to open finder: {}", e))?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // Try to use xdg-open or nautilus
+        let _ = Command::new("nautilus").arg(&path).spawn();
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_file_or_folder(path: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    
+    if path.is_file() {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("Failed to delete file: {}", e))?;
+    } else if path.is_dir() {
+        std::fs::remove_dir_all(&path)
+            .map_err(|e| format!("Failed to delete folder: {}", e))?;
+    } else {
+        return Err("Path does not exist".to_string());
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]

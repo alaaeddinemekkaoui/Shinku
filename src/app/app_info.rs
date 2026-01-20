@@ -1,9 +1,9 @@
 /// Application metadata and information
-/// This file contains all essential information about Shinku Editor
+/// This file contains all essential information about Shinku 神紅 Editor
 
-pub const APP_NAME: &str = "Shinku";
+pub const APP_NAME: &str = "Shinku 神紅";
 pub const APP_VERSION: &str = "0.1.0";
-pub const APP_EDITION: &str = "Tauri Edition";
+pub const APP_EDITION: &str = "Crystal Chronicle";
 pub const AUTHOR: &str = "Alaa Mekkaoui";
 pub const LICENSE: &str = "MIT";
 pub const REPOSITORY: &str = "https://github.com/alaaeddinemekkaoui/shinku";
@@ -39,7 +39,7 @@ impl AppInfo {
                  "A: Because every line of code you write feels like a tiny, fiery adventure — think Phoenix reborn! 🔥"),
                 
                 ("Q: What makes Shinku special?", 
-                 "A: Lightning-fast Rust core + Tauri + CodeMirror 6 wizardry. Your code writes itself… almost. ⚡"),
+                 "A: I don't know , fun project to work ."),
                 
                 ("Q: Can I use it for multiple languages?", 
                  "A: Absolutely! JavaScript, Python, Rust, and more. Shinku speaks them all. 🗣️"),
@@ -53,14 +53,8 @@ impl AppInfo {
                 ("Q: Are there keyboard shortcuts?", 
                  "A: Of course! Hit the keys, bend the editor to your will. ⌨️"),
                 
-                ("Q: Can I experiment freely?", 
-                 "A: Totally. Break it, fix it, learn Rust, have fun — repeat. 🧪"),
-                
-                ("Q: Is it beginner-friendly?", 
-                 "A: Even if you're new to Rust, Shinku makes coding feel like a game. 🎮"),
-                
                 ("Q: What’s next for Shinku?", 
-                 "A: UI polish, settings, and maybe a dragon or two. Phase 3 incoming! 🐉"),
+                 "A: I'm working on basics for the moment , so more features coming ! 🐉"),
             ],
         }
     }

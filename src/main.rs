@@ -39,12 +39,12 @@ fn main() {
     ).init();
 
     log::info!("╔═══════════════════════════════════════╗");
-    log::info!("║      SHINKU TEXT EDITOR (TAURI)       ║");
+    log::info!("║    SHINKU 神紅 TEXT EDITOR     ║");
     log::info!("║   From the ashes, rises simplicity    ║");
     log::info!("╚═══════════════════════════════════════╝");
     log::info!("");
-    log::info!("Version: 0.1.0 (Tauri Edition)");
-    log::info!("Built with: Rust + Tauri + React + Vite");
+    log::info!("Version: 0.1.0 (Crystal Chronicle)");
+    log::info!("Built with: Rust + React + Vite");
     log::info!("");
 
     tauri::Builder::default()
@@ -66,7 +66,7 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    log::info!("Shinku editor shutting down");
+    log::info!("Shinku 神紅 editor shutting down");
 }
 
 // ============================================================================

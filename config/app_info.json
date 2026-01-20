@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Shinku Editor",
+    "name": "Shinku 神紅 Editor",
     "version": "0.1.0",
     "author": "Alaa Mekkaoui",
     "description": "A modern, lightweight text editor written in Rust",

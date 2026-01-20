@@ -9,7 +9,6 @@
 /// - Side effects (file I/O, dialogs)
 
 use crate::app::state::{AppState, Document};
-use crate::platform::fs;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
@@ -42,13 +41,14 @@ impl CommandResult {
     }
 }
 
-/// Open a file
+/// Open a file in a new tab
 pub fn open_file(app_state: &mut AppState, path: PathBuf) -> Result<CommandResult> {
-    let content = fs::read_file(&path)
+    let content = crate::platform::fs::read_file(&path)
         .with_context(|| format!("Failed to open file: {}", path.display()))?;
 
-    let document = Document::from_file(path.clone(), content);
-    app_state.current_document = document;
+    let id = path.display().to_string();
+    let document = Document::from_file(id, path.clone(), content);
+    app_state.add_document(document);
 
     Ok(CommandResult::success_with_message(format!(
         "Opened {}",
@@ -59,11 +59,16 @@ pub fn open_file(app_state: &mut AppState, path: PathBuf) -> Result<CommandResul
 /// Save the current file
 pub fn save_file(app_state: &mut AppState) -> Result<CommandResult> {
     if let Some(path) = app_state.file_path().cloned() {
-        let content = app_state.editor().content();
-        fs::write_file(&path, &content)
+        let content = app_state
+            .editor()
+            .map(|e| e.content())
+            .unwrap_or_default();
+        crate::platform::fs::write_file(&path, &content)
             .with_context(|| format!("Failed to save file: {}", path.display()))?;
 
-        app_state.editor_mut().mark_saved();
+        if let Some(doc) = app_state.active_document_mut() {
+            doc.editor.mark_saved();
+        }
 
         Ok(CommandResult::success_with_message(format!(
             "Saved {}",
@@ -79,18 +84,23 @@ pub fn save_file(app_state: &mut AppState) -> Result<CommandResult> {
 
 /// Save the current file with a new path
 pub fn save_file_as(app_state: &mut AppState, path: PathBuf) -> Result<CommandResult> {
-    let content = app_state.editor().content();
-    fs::write_file(&path, &content)
+    let content = app_state
+        .editor()
+        .map(|e| e.content())
+        .unwrap_or_default();
+    crate::platform::fs::write_file(&path, &content)
         .with_context(|| format!("Failed to save file: {}", path.display()))?;
 
     // Update document metadata
-    app_state.current_document.file_path = Some(path.clone());
-    app_state.current_document.title = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Untitled")
-        .to_string();
-    app_state.editor_mut().mark_saved();
+    if let Some(doc) = app_state.active_document_mut() {
+        doc.file_path = Some(path.clone());
+        doc.title = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Untitled")
+            .to_string();
+        doc.editor.mark_saved();
+    }
 
     Ok(CommandResult::success_with_message(format!(
         "Saved as {}",
@@ -100,12 +110,125 @@ pub fn save_file_as(app_state: &mut AppState, path: PathBuf) -> Result<CommandRe
 
 /// Create a new document
 pub fn new_file(app_state: &mut AppState) -> Result<CommandResult> {
-    // TODO: In a real app, check if current document is modified and prompt to save
-    app_state.current_document = Document::new();
+    let document = Document::default();
+    app_state.add_document(document);
     Ok(CommandResult::success())
 }
 
-/// Check if the current document needs to be saved
-pub fn needs_save(app_state: &AppState) -> bool {
-    app_state.editor().is_modified()
+/// Open a folder and set it as the current workspace
+pub fn open_folder(app_state: &mut AppState, path: PathBuf) -> Result<CommandResult> {
+    // Check if folder exists
+    if !path.is_dir() {
+        return Ok(CommandResult::error(format!(
+            "Not a directory: {}",
+            path.display()
+        )));
+    }
+
+    app_state.current_folder = Some(path.clone());
+
+    Ok(CommandResult::success_with_message(format!(
+        "Opened folder: {}",
+        path.display()
+    )))
+}
+
+/// Close the current folder
+pub fn close_folder(app_state: &mut AppState) -> Result<CommandResult> {
+    app_state.current_folder = None;
+    Ok(CommandResult::success())
+}
+
+/// Get the file tree for the current folder
+pub fn get_file_tree(app_state: &AppState) -> Result<Vec<FileTreeNode>> {
+    if let Some(folder) = &app_state.current_folder {
+        build_file_tree(folder)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+/// Represents a file or folder in the file tree
+#[derive(Debug, Clone)]
+pub struct FileTreeNode {
+    pub path: PathBuf,
+    pub name: String,
+    pub is_dir: bool,
+    pub children: Option<Vec<FileTreeNode>>,
+}
+
+/// Build file tree recursively (with depth limit to avoid performance issues)
+fn build_file_tree(path: &PathBuf) -> Result<Vec<FileTreeNode>> {
+    build_file_tree_recursive(path, 0)
+}
+
+fn build_file_tree_recursive(path: &PathBuf, depth: usize) -> Result<Vec<FileTreeNode>> {
+    const MAX_DEPTH: usize = 10; // Limit recursion depth
+    
+    if depth > MAX_DEPTH {
+        return Ok(Vec::new());
+    }
+
+    let mut nodes = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("Unknown")
+                .to_string();
+
+            let is_dir = path.is_dir();
+            
+            let children = if is_dir {
+                build_file_tree_recursive(&path, depth + 1).ok()
+            } else {
+                None
+            };
+
+            nodes.push(FileTreeNode {
+                path,
+                name,
+                is_dir,
+                children,
+            });
+        }
+    }
+
+    // Sort: directories first, then by name
+    nodes.sort_by(|a, b| {
+        match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.cmp(&b.name),
+        }
+    });
+
+    Ok(nodes)
+}
+
+/// Switch between open documents
+pub fn switch_document(app_state: &mut AppState, document_id: &str) -> Result<CommandResult> {
+    if app_state.set_active_document(document_id.to_string()) {
+        Ok(CommandResult::success())
+    } else {
+        Ok(CommandResult::error(format!(
+            "Document not found: {}",
+            document_id
+        )))
+    }
+}
+
+/// Close a document tab
+pub fn close_document(app_state: &mut AppState, document_id: &str) -> Result<CommandResult> {
+    if app_state.remove_document(document_id) {
+        Ok(CommandResult::success())
+    } else {
+        Ok(CommandResult::error(format!(
+            "Document not found: {}",
+            document_id
+        )))
+    }
 }

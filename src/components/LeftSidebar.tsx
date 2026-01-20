@@ -95,7 +95,7 @@ export default function LeftSidebar({
   ];
 
   const aboutMenuItems = [
-    { label: 'About Shinku', action: () => { setShowAbout(true); setActiveDropdown(null); } },
+    { label: 'About Shinku 神紅', action: () => { setShowAbout(true); setActiveDropdown(null); } },
     { label: 'Keyboard Shortcuts', action: () => { setShowShortcuts(true); setActiveDropdown(null); } },
   ];
 

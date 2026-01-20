@@ -11,6 +11,7 @@ use crate::app::commands;
 use crate::core::{Direction, Position};
 use anyhow::Result;
 use std::path::PathBuf;
+use std::fs;
 
 /// Main application controller
 /// 
@@ -32,22 +33,34 @@ impl AppController {
     /// Get the visible lines for rendering
     /// Returns a vector of (line_number, line_text) tuples
     pub fn visible_lines(&self, start_line: usize, line_count: usize) -> Vec<(usize, String)> {
-        self.state.editor().visible_lines(start_line, line_count)
+        self.state
+            .editor()
+            .map(|e| e.visible_lines(start_line, line_count))
+            .unwrap_or_default()
     }
 
     /// Get the cursor position for display (1-indexed)
     pub fn cursor_position_display(&self) -> (usize, usize) {
-        self.state.editor().cursor_position().to_display()
+        self.state
+            .editor()
+            .map(|e| e.cursor_position().to_display())
+            .unwrap_or((1, 1))
     }
 
     /// Get the cursor position (0-indexed)
     pub fn cursor_position(&self) -> Position {
-        self.state.editor().cursor_position()
+        self.state
+            .editor()
+            .map(|e| e.cursor_position())
+            .unwrap_or(Position { line: 0, column: 0 })
     }
 
     /// Get the total line count
     pub fn line_count(&self) -> usize {
-        self.state.editor().line_count()
+        self.state
+            .editor()
+            .map(|e| e.line_count())
+            .unwrap_or(1)
     }
 
     /// Get the document title
@@ -57,22 +70,34 @@ impl AppController {
 
     /// Get all text content
     pub fn content(&self) -> String {
-        self.state.editor().content()
+        self.state
+            .editor()
+            .map(|e| e.content())
+            .unwrap_or_default()
     }
 
     /// Check if document is modified
     pub fn is_modified(&self) -> bool {
-        self.state.editor().is_modified()
+        self.state
+            .editor()
+            .map(|e| e.is_modified())
+            .unwrap_or(false)
     }
 
     /// Check if undo is available
     pub fn can_undo(&self) -> bool {
-        self.state.editor().can_undo()
+        self.state
+            .editor()
+            .map(|e| e.can_undo())
+            .unwrap_or(false)
     }
 
     /// Check if redo is available
     pub fn can_redo(&self) -> bool {
-        self.state.editor().can_redo()
+        self.state
+            .editor()
+            .map(|e| e.can_redo())
+            .unwrap_or(false)
     }
 
     // ========== Editor operations (triggered by UI events) ==========
@@ -80,8 +105,10 @@ impl AppController {
     /// Handle text input from the user
     pub fn handle_text_input(&mut self, text: &str) -> Result<()> {
         log::debug!("Text input: {:?}", text);
-        for ch in text.chars() {
-            self.state.editor_mut().insert_char(ch)?;
+        if let Some(editor) = self.state.editor_mut() {
+            for ch in text.chars() {
+                editor.insert_char(ch)?;
+            }
         }
         Ok(())
     }
@@ -89,43 +116,53 @@ impl AppController {
     /// Handle backspace key
     pub fn handle_backspace(&mut self) -> Result<()> {
         log::debug!("Backspace");
-        self.state.editor_mut().backspace()?;
+        if let Some(editor) = self.state.editor_mut() {
+            editor.backspace()?;
+        }
         Ok(())
     }
 
     /// Handle delete key
     pub fn handle_delete(&mut self) -> Result<()> {
         log::debug!("Delete");
-        self.state.editor_mut().delete_char()?;
+        if let Some(editor) = self.state.editor_mut() {
+            editor.delete_char()?;
+        }
         Ok(())
     }
 
     /// Handle enter/return key
     pub fn handle_enter(&mut self) -> Result<()> {
         log::debug!("Enter");
-        self.state.editor_mut().insert_newline()?;
+        if let Some(editor) = self.state.editor_mut() {
+            editor.insert_newline()?;
+        }
         Ok(())
     }
 
     /// Handle cursor movement
     pub fn move_cursor(&mut self, direction: Direction) -> Result<()> {
         log::debug!("Move cursor: {:?}", direction);
-        self.state.editor_mut().move_cursor(direction)?;
+        if let Some(editor) = self.state.editor_mut() {
+            editor.move_cursor(direction)?;
+        }
         Ok(())
     }
 
     /// Move cursor by lines (for Page Up/Page Down - moves by 10 lines)
     pub fn move_cursor_by_lines(&mut self, line_offset: i32) -> Result<()> {
-        let current_pos = self.state.editor().cursor_position();
-        let new_line = (current_pos.line as i32 + line_offset).max(0) as usize;
-        let total_lines = self.state.editor().line_count().saturating_sub(1);
-        let clamped_line = new_line.min(total_lines);
-        
-        for _ in 0..line_offset.abs() {
-            if line_offset > 0 {
-                self.state.editor_mut().move_cursor(Direction::Down)?;
-            } else {
-                self.state.editor_mut().move_cursor(Direction::Up)?;
+        if let Some(editor) = self.state.editor_mut() {
+            let current_pos = editor.cursor_position();
+            let new_line = (current_pos.line as i32 + line_offset).max(0) as usize;
+            let total_lines = editor.line_count().saturating_sub(1);
+            let _clamped_line = new_line.min(total_lines);
+            
+            for _ in 0..line_offset.abs() {
+                if line_offset > 0 {
+                    editor.move_cursor(Direction::Down)?;
+                } else {
+                    editor.move_cursor(Direction::Up)?;
+                }
             }
         }
         Ok(())
@@ -134,13 +171,21 @@ impl AppController {
     /// Handle undo
     pub fn undo(&mut self) -> Result<bool> {
         log::debug!("Undo");
-        Ok(self.state.editor_mut().undo()?)
+        if let Some(editor) = self.state.editor_mut() {
+            Ok(editor.undo()?)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Handle redo
     pub fn redo(&mut self) -> Result<bool> {
         log::debug!("Redo");
-        Ok(self.state.editor_mut().redo()?)
+        if let Some(editor) = self.state.editor_mut() {
+            Ok(editor.redo()?)
+        } else {
+            Ok(false)
+        }
     }
 
     // ========== File operations ==========
@@ -178,12 +223,108 @@ impl AppController {
         self.state.file_path().map(|p| p.display().to_string())
     }
 
+    /// Set active document by ID
+    pub fn set_active_document(&mut self, id: String) -> bool {
+        self.state.set_active_document(id)
+    }
+
+    /// Get all open document IDs
+    pub fn open_document_ids(&self) -> Vec<String> {
+        self.state.open_document_ids()
+    }
+
+    /// Set the current folder path
+    pub fn set_current_folder(&mut self, path: PathBuf) {
+        self.state.current_folder = Some(path);
+    }
+
+    /// Get the current folder path
+    pub fn current_folder(&self) -> Option<&PathBuf> {
+        self.state.current_folder.as_ref()
+    }
+
+    /// Generate directory tree from a folder
+    pub fn get_directory_tree(&self, folder: &PathBuf) -> Result<Vec<DirectoryEntry>> {
+        generate_tree_entries(folder, 0)
+    }
+
     // ========== For testing/debugging ==========
 
     /// Set content directly (useful for testing)
     pub fn set_content(&mut self, content: &str) {
-        self.state.editor_mut().set_content(content);
+        if let Some(editor) = self.state.editor_mut() {
+            editor.set_content(content);
+        }
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DirectoryEntry {
+    pub id: String,
+    pub name: String,
+    pub entry_type: String, // "file" or "folder"
+    pub path: String,
+    pub children: Option<Vec<DirectoryEntry>>,
+}
+
+fn generate_tree_entries(path: &PathBuf, depth: usize) -> Result<Vec<DirectoryEntry>> {
+    const MAX_DEPTH: usize = 10;
+    
+    if depth > MAX_DEPTH {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = Vec::new();
+    
+    if path.is_dir() {
+        let mut entries_with_order: Vec<_> = fs::read_dir(path)?
+            .filter_map(|entry| entry.ok())
+            .collect();
+        
+        // Sort: folders first, then files, alphabetically
+        entries_with_order.sort_by(|a, b| {
+            let a_is_dir = a.path().is_dir();
+            let b_is_dir = b.path().is_dir();
+            
+            if a_is_dir != b_is_dir {
+                return if a_is_dir { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+            }
+            
+            let a_name = a.file_name();
+            let b_name = b.file_name();
+            a_name.cmp(&b_name)
+        });
+        
+        for dir_entry in entries_with_order {
+            let path = dir_entry.path();
+            let name = dir_entry.file_name();
+            let name_str = name.to_string_lossy().to_string();
+            
+            // Skip hidden files and common unneeded directories
+            if name_str.starts_with('.') || name_str == "node_modules" || name_str == "target" {
+                continue;
+            }
+            
+            let is_dir = path.is_dir();
+            let id = path.display().to_string();
+            
+            let entry = DirectoryEntry {
+                id: id.clone(),
+                name: name_str,
+                entry_type: if is_dir { "folder".to_string() } else { "file".to_string() },
+                path: id,
+                children: if is_dir {
+                    Some(generate_tree_entries(&path, depth + 1)?)
+                } else {
+                    None
+                },
+            };
+            
+            entries.push(entry);
+        }
+    }
+    
+    Ok(entries)
 }
 
 impl Default for AppController {

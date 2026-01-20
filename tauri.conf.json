@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "Shinku",
+    "productName": "Shinku 神紅",
     "version": "0.1.0"
   },
   "tauri": {
@@ -49,7 +49,7 @@
         "fullscreen": false,
         "height": 700,
         "resizable": true,
-        "title": "Shinku Editor",
+        "title": "Shinku 神紅 Editor",
         "width": 1000,
         "minWidth": 800,
         "minHeight": 600

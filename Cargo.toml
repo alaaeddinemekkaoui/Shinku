@@ -3,7 +3,7 @@ name = "shinku"
 version = "0.1.0"
 edition = "2021"
 authors = ["Alaa"]
-description = "Shinku - A modern, lightweight text editor built with Tauri"
+description = "Shinku 神紅 - A modern, lightweight text editor built with Tauri"
 license = "MIT"
 
 [dependencies]

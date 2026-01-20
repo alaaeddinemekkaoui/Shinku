@@ -2,7 +2,7 @@
 
 echo ""
 echo "╔════════════════════════════════════════╗"
-echo "║     SHINKU EDITOR - Starting App...    ║"
+echo "║   SHINKU 神紅 EDITOR - Starting App...  ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
 
