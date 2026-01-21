@@ -20,6 +20,8 @@ interface FileTreeProps {
   onCreateFile?: (parentPath: string, fileName: string) => void;
   onCreateFolder?: (parentPath: string, folderName: string) => void;
   activeFilePath?: string;
+  onOpenFile?: () => void;
+  onOpenFolder?: () => void;
 }
 
 interface ContextMenu {
@@ -37,12 +39,18 @@ const FileTree: React.FC<FileTreeProps> = ({
   onCreateFile,
   onCreateFolder,
   activeFilePath,
+  onOpenFile,
+  onOpenFolder,
 }) => {
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [creatingFile, setCreatingFile] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [creatingName, setCreatingName] = useState("");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [lastClickId, setLastClickId] = useState<string | null>(null);
+  const [lastClickTime, setLastClickTime] = useState<number>(0);
+  const [creatingInNodePath, setCreatingInNodePath] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Cache metadata when tree is rendered
@@ -77,13 +85,29 @@ const FileTree: React.FC<FileTreeProps> = ({
 
   const handleNodeClick = (node: TreeNode, e: React.MouseEvent) => {
     e.stopPropagation();
+    const now = Date.now();
+    const isDoubleClick = lastClickId === node.id && now - lastClickTime < 300;
+    
+    setLastClickId(node.id);
+    setLastClickTime(now);
 
+    // Single click: select the node
+    if (!isDoubleClick) {
+      setSelectedNodeId(node.id);
+      if (node.type === 'file') {
+        onFileSelect(node);
+      }
+      return;
+    }
+
+    // Double click: expand/open
     if (node.type === 'folder') {
       toggleFolder(node.id);
       if (onFolderOpen && !openFolders.has(node.id)) {
         onFolderOpen(node);
       }
     } else {
+      // For files, double click opens them (same as select for now)
       onFileSelect(node);
     }
   };
@@ -100,7 +124,17 @@ const FileTree: React.FC<FileTreeProps> = ({
   };
 
   const handleContextMenuAction = (action: string) => {
-    if (contextMenu && onContextMenu) {
+    if (!contextMenu) return;
+
+    if (action === 'new-file' && contextMenu.node.type === 'folder') {
+      setCreatingInNodePath(contextMenu.node.path);
+      setCreatingFile(true);
+      setCreatingName("");
+    } else if (action === 'new-folder' && contextMenu.node.type === 'folder') {
+      setCreatingInNodePath(contextMenu.node.path);
+      setCreatingFolder(true);
+      setCreatingName("");
+    } else if (onContextMenu) {
       onContextMenu(contextMenu.node, action);
     }
     setContextMenu(null);
@@ -119,7 +153,8 @@ const FileTree: React.FC<FileTreeProps> = ({
   const handleConfirmCreation = async (type: 'file' | 'folder') => {
     if (!creatingName.trim()) return;
 
-    let parentPath = folderPath;
+    // Use the specific node path if creating inside a folder, otherwise use folderPath
+    let parentPath = creatingInNodePath || folderPath;
     
     // If no folder path is provided, get it from the backend (from open folder or active file)
     if (!parentPath) {
@@ -148,12 +183,14 @@ const FileTree: React.FC<FileTreeProps> = ({
     setCreatingFile(false);
     setCreatingFolder(false);
     setCreatingName("");
+    setCreatingInNodePath(null);
   };
 
   const handleCancelCreation = () => {
     setCreatingFile(false);
     setCreatingFolder(false);
     setCreatingName("");
+    setCreatingInNodePath(null);
   };
 
   // Close context menu when clicking elsewhere
@@ -174,11 +211,12 @@ const FileTree: React.FC<FileTreeProps> = ({
   const renderNode = (node: TreeNode, depth: number = 0) => {
     const isOpen = openFolders.has(node.id);
     const isActive = activeFilePath === node.path;
+    const isSelected = selectedNodeId === node.id;
 
     return (
       <div key={node.id}>
         <div
-          className={`tree-item ${isActive ? 'active' : ''}`}
+          className={`tree-item ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
           style={{ paddingLeft: `${depth * 16}px` }}
           onClick={(e) => handleNodeClick(node, e)}
           onContextMenu={(e) => handleContextMenu(node, e)}
@@ -218,24 +256,26 @@ const FileTree: React.FC<FileTreeProps> = ({
     <div className="file-tree-container">
       <div className="file-tree-header">
         <span className="file-tree-folder-name" title={folderPath}>
-          📁 {getFolderName()}
+          {getFolderName()}
         </span>
-        <div className="file-tree-actions">
-          <button 
-            className="file-tree-action-btn" 
-            title="New File"
-            onClick={handleCreateFile}
-          >
-            +📄
-          </button>
-          <button 
-            className="file-tree-action-btn" 
-            title="New Folder"
-            onClick={handleCreateFolder}
-          >
-            +📁
-          </button>
-        </div>
+        {nodes.length > 0 && (
+          <div className="file-tree-actions">
+            <button 
+              className="file-tree-action-btn" 
+              title="New File"
+              onClick={handleCreateFile}
+            >
+              +
+            </button>
+            <button 
+              className="file-tree-action-btn" 
+              title="New Folder"
+              onClick={handleCreateFolder}
+            >
+              +
+            </button>
+          </div>
+        )}
       </div>
       {(creatingFile || creatingFolder) && (
         <div className="file-tree-create-input">
@@ -260,7 +300,31 @@ const FileTree: React.FC<FileTreeProps> = ({
         {nodes.length > 0 ? (
           nodes.map((node) => renderNode(node))
         ) : (
-          <div className="tree-empty">No folder opened</div>
+          <div className="tree-empty">
+            <div className="empty-actions-compact">
+              <button className="empty-action-btn-compact" onClick={(e) => { e.stopPropagation(); onOpenFile?.(); }}>
+                <span className="material-symbols-outlined">description</span>
+                <span>Open File</span>
+              </button>
+              <button className="empty-action-btn-compact" onClick={(e) => { e.stopPropagation(); onOpenFolder?.(); }}>
+                <span className="material-symbols-outlined">folder_open</span>
+                <span>Open Folder</span>
+              </button>
+              <button 
+                className="empty-action-btn-compact" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const fileName = prompt('File name:');
+                  if (fileName?.trim() && folderPath) {
+                    onCreateFile?.(folderPath, fileName.trim());
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined">add_circle</span>
+                <span>New File</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

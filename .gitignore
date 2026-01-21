@@ -16,3 +16,7 @@ dist/
 
 # Tauri
 src-tauri/target/
+# Test files and directories (prevent rebuild triggers)
+test/
+**/test/
+src-tauri/test/

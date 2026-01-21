@@ -17,10 +17,6 @@ interface FileSidebarProps {
 }
 
 const FileSidebar: React.FC<FileSidebarProps> = ({ files, onFileSelect, onFileClose }) => {
-  if (files.length === 0) {
-    return null;
-  }
-
   return (
     <div className="file-sidebar">
       <div className="file-tabs">

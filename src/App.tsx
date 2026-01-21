@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import Editor from "./components/Editor";
-import MenuBar from "./components/MenuBar";
-import FileHeader from "./components/FileHeader";
 import StatusBar from "./components/StatusBar";
 import FindReplace from "./components/FindReplace";
 import AboutDialog from "./components/AboutDialog";
 import ShortcutsDialog from "./components/ShortcutsDialog";
+import Terminal from "./components/Terminal";
 import FileSidebar, { FileTab } from "./components/FileSidebar";
 import FileTree, { TreeNode } from "./components/FileTree";
+import Toast, { ToastMessage } from "./components/Toast";
+import Sidebar from "./components/Sidebar";
+import SearchPanel from "./components/SearchPanel";
+import Header from "./components/Header";
+import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
+import "./styles/app-new-layout.css";
 
 interface EditorState {
   content: string;
@@ -62,12 +67,127 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [openFiles, setOpenFiles] = useState<FileTab[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [fileContents, setFileContents] = useState<Record<string, EditorState>>({});
   const [folderTree, setFolderTree] = useState<TreeNode[]>([]);
-  const [showFileTree, setShowFileTree] = useState(false);
   const [currentFolderPath, setCurrentFolderPath] = useState<string>("");
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  
+  // UI state
+  const [sidebarActive, setSidebarActive] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(() => {
+    const saved = localStorage.getItem("leftPanelWidth");
+    const width = saved ? parseInt(saved, 10) : 300;
+    return Math.min(Math.max(width, 180), 520);
+  });
+  const [ctrlKPressed, setCtrlKPressed] = useState(false);
+
+  // Toast helper function
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" | "warning" = "info", duration = 3000) => {
+    const id = Date.now().toString();
+    const newToast: ToastMessage = { id, message, type, duration };
+    setToasts(prev => [...prev, newToast]);
+  }, []);
+  const unsavedFiles = openFiles.filter(f => f.isModified || !f.isSaved);
+
+  const handleSaveFileAs = useCallback(async () => {
+    try {
+      const newPath = await invoke<string>("save_file_as");
+      if (!newPath) return;
+      
+      const state = await invoke<EditorState>("get_editor_state");
+      setEditorState(state);
+      
+      const fileName = newPath.split('/').pop() || newPath;
+      
+      if (activeFileId) {
+        setOpenFiles(prev => prev.map(f =>
+          f.id === activeFileId
+            ? { ...f, isModified: false, isSaved: true, name: fileName, path: newPath }
+            : f
+        ));
+        setFileContents(prev => ({
+          ...prev,
+          [activeFileId]: state
+        }));
+      }
+      
+      showToast(`File saved as "${fileName}"`, "success");
+    } catch (error) {
+      console.error("Failed to save file as:", error);
+      showToast(`Failed to save file as: ${error}`, "error");
+    }
+  }, [activeFileId, showToast]);
+
+  const handleSaveFile = useCallback(async () => {
+    try {
+      // Check if file is Untitled
+      if (editorState.title === "Untitled") {
+        await handleSaveFileAs();
+        return;
+      }
+      
+      const state = await invoke<EditorState>("save_file");
+      setEditorState(state);
+      if (activeFileId) {
+        setOpenFiles(prev => prev.map(f =>
+          f.id === activeFileId
+            ? { ...f, isModified: false, isSaved: true, name: state.title.split('/').pop() || state.title }
+            : f
+        ));
+      }
+      showToast("File saved successfully", "success");
+    } catch (error) {
+      console.error("Failed to save file:", error);
+      showToast(`Save failed: ${error}`, "error");
+    }
+  }, [editorState.title, activeFileId, showToast, handleSaveFileAs]);
+
+  const handleCloseAll = useCallback(async () => {
+    if (unsavedFiles.length > 0) {
+      setShowUnsavedDialog(true);
+      return;
+    }
+    // Close all without prompt
+    setOpenFiles([]);
+    setActiveFileId(null);
+    setEditorState(prev => ({ ...prev, content: "", title: "Untitled", is_modified: false, is_saved: true }));
+  }, [unsavedFiles]);
+
+  const saveSelectedFiles = useCallback(async (ids: string[]) => {
+    // Save selected unsaved files sequentially
+    for (const id of ids) {
+      const file = openFiles.find(f => f.id === id);
+      if (!file) continue;
+      setActiveFileId(id);
+      // If file is Untitled or has no path, trigger Save As
+      if (!file.path || file.name === "Untitled") {
+        await handleSaveFileAs();
+      } else {
+        await handleSaveFile();
+      }
+    }
+    setShowUnsavedDialog(false);
+    // After saving, close all
+    setOpenFiles([]);
+    setActiveFileId(null);
+    setEditorState(prev => ({ ...prev, content: "", title: "Untitled", is_modified: false, is_saved: true }));
+  }, [openFiles, handleSaveFileAs, handleSaveFile]);
+
+  const dontSaveAndClose = useCallback(() => {
+    setShowUnsavedDialog(false);
+    setOpenFiles([]);
+    setActiveFileId(null);
+    setEditorState(prev => ({ ...prev, content: "", title: "Untitled", is_modified: false, is_saved: true }));
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   // Fetch initial editor state
   useEffect(() => {
@@ -76,37 +196,30 @@ function App() {
       .catch(console.error);
   }, []);
 
-  const handleContentChange = useCallback((content: string) => {
-    // Update local state immediately for smooth typing
-    setEditorState((prev) => ({
-      ...prev,
-      content,
-      is_modified: true,
-      is_saved: false,  // Mark as unsaved in local state
-    }));
+  // Persist left panel width
+  useEffect(() => {
+    localStorage.setItem("leftPanelWidth", String(leftPanelWidth));
+  }, [leftPanelWidth]);
 
-    // Update file contents for active file
+  const handleContentChange = useCallback((content: string) => {
+    setEditorState((prev) => ({ ...prev, content, is_modified: true, is_saved: false }));
+
     if (activeFileId) {
-      setOpenFiles(prev => prev.map(f => 
-        f.id === activeFileId 
-          ? { ...f, isModified: true, isSaved: false }
-          : f
+      setOpenFiles(prev => prev.map(f =>
+        f.id === activeFileId ? { ...f, isModified: true, isSaved: false } : f
       ));
+
       setFileContents(prev => ({
         ...prev,
         [activeFileId]: {
-          ...prev[activeFileId],
+          ...(prev[activeFileId] || editorState),
           content,
           is_modified: true,
           is_saved: false,
-          line_count: content.split("\n").length,
         }
       }));
     }
-
-    // Sync to backend - backend will mark as modified
-    invoke("set_content", { content }).catch(console.error);
-  }, [activeFileId]);
+  }, [activeFileId, editorState]);
 
   const handleCursorChange = useCallback((line: number, column: number) => {
     setCursorPos({ line, column });
@@ -116,15 +229,16 @@ function App() {
     try {
       const state = await invoke<EditorState>("new_file");
       setEditorState(state);
-      const fileId = `untitled-${Date.now()}`;
+      const fileId = Date.now().toString();
       const newFile: FileTab = {
         id: fileId,
         name: state.title,
         path: state.title,
         isActive: true,
         isModified: false,
-        isSaved: true
+        isSaved: true,
       };
+
       setOpenFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile]);
       setFileContents(prev => ({ ...prev, [fileId]: state }));
       setActiveFileId(fileId);
@@ -132,22 +246,6 @@ function App() {
       console.error("Failed to create new file:", error);
     }
   }, []);
-
-  const handleSaveFile = useCallback(async () => {
-    try {
-      const state = await invoke<EditorState>("save_file");
-      setEditorState(state);
-      if (activeFileId) {
-        setOpenFiles(prev => prev.map(f =>
-          f.id === activeFileId
-            ? { ...f, isModified: false, isSaved: true }
-            : f
-        ));
-      }
-    } catch (error) {
-      console.error("Failed to save file:", error);
-    }
-  }, [activeFileId]);
 
   const handleOpenFileFromPath = useCallback(async (filePath: string, fileName: string) => {
     // Check if active file has unsaved changes
@@ -164,9 +262,9 @@ function App() {
     }
 
     try {
-      // Call backend to open file - but we need to store the file path in the backend
+      // Call backend to open file from specific path
       const state = await invoke<EditorState>("open_file_from_path", { filePath });
-      if (!state || !state.content === undefined) {
+      if (!state || state.content === undefined) {
         console.error("Failed to open file");
         return;
       }
@@ -244,15 +342,6 @@ function App() {
       console.error("Failed to open file:", error);
     }
   }, [openFiles, activeFileId, handleSaveFile]);
-
-  const handleSaveFileAs = useCallback(async () => {
-    try {
-      const state = await invoke<EditorState>("save_file_as");
-      setEditorState(state);
-    } catch (error) {
-      console.error("Failed to save file as:", error);
-    }
-  }, []);
 
   const handleUndo = useCallback(async () => {
     try {
@@ -332,20 +421,51 @@ function App() {
       }
       setCurrentFolderPath(response.folder_path);
       setFolderTree(convertToTreeNodes(response.entries));
-      setShowFileTree(true);
+      showToast(`Opened folder: ${response.folder_path}`, "success");
     } catch (error) {
       console.error('Failed to open folder:', error);
+      showToast(`Failed to open folder: ${error}`, "error");
     }
-  }, []);
+  }, [showToast]);
 
-  const refreshFolderTree = useCallback(async () => {
-    if (currentFolderPath) {
-      try {
-        const response = await invoke<FolderTreeResponse>('refresh_folder_tree');
-        setFolderTree(convertToTreeNodes(response.entries));
-      } catch (error) {
-        console.error('Failed to refresh folder:', error);
+  // Update a specific node's children in the folder tree
+  const updateTreeWithFolderEntries = (nodes: TreeNode[], targetPath: string, entries: DirectoryEntry[]): TreeNode[] => {
+    return nodes.map(node => {
+      if (node.path === targetPath) {
+        return { ...node, children: convertToTreeNodes(entries) };
       }
+      if (node.children) {
+        const updatedChildren = updateTreeWithFolderEntries(node.children, targetPath, entries);
+        if (updatedChildren !== node.children) {
+          return { ...node, children: updatedChildren };
+        }
+      }
+      return node;
+    });
+  };
+
+  const getParentPath = (path: string) => {
+    if (!path) return "";
+    const normalized = path.replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    if (parts.length <= 1) return "";
+    parts.pop();
+    return parts.join('/');
+  };
+
+  // Refresh a folder tree for a given path. If `path` is omitted, refresh the current open folder.
+  const refreshFolder = useCallback(async (path?: string) => {
+    const targetPath = path || currentFolderPath;
+    if (!targetPath) return;
+    try {
+      const response = await invoke<FolderTreeResponse>('refresh_folder_tree', { path: targetPath });
+      if (path && path !== currentFolderPath) {
+        setFolderTree(prev => updateTreeWithFolderEntries(prev, targetPath, response.entries));
+      } else {
+        setFolderTree(convertToTreeNodes(response.entries));
+      }
+    } catch (error) {
+      console.error('Failed to refresh folder:', error);
     }
   }, [currentFolderPath]);
 
@@ -364,11 +484,26 @@ function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [openFiles]);
 
-  // Keyboard shortcuts
+  // Persist left panel width
+  useEffect(() => {
+    localStorage.setItem("leftPanelWidth", String(leftPanelWidth));
+  }, [leftPanelWidth]);
+
+  // Keyboard shortcuts handler with Ctrl+K tracking for Ctrl+K Ctrl+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+` - Toggle Terminal
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        setShowTerminal(!showTerminal);
+      }
+      // Ctrl+K Ctrl+S - Show Shortcuts
+      else if (e.ctrlKey && e.key === 'k' && !ctrlKPressed) {
+        e.preventDefault();
+        setCtrlKPressed(true);
+      }
       // Ctrl+N - New File
-      if (e.ctrlKey && e.key === 'n' && !e.shiftKey) {
+      else if (e.ctrlKey && e.key === 'n' && !e.shiftKey) {
         e.preventDefault();
         handleNewFile();
       }
@@ -407,18 +542,49 @@ function App() {
         e.preventDefault();
         setShowPreferences(true);
       }
-      // Escape - Close dialogs
+      // Handle Ctrl+K Ctrl+S combo
+      else if (ctrlKPressed && e.ctrlKey && e.key === 's' && !e.shiftKey) {
+        e.preventDefault();
+        setShowShortcuts(true);
+        setCtrlKPressed(false);
+      }
+      // Escape - Close dialogs and reset Ctrl+K state
       else if (e.key === 'Escape') {
+        setCtrlKPressed(false);
         setShowFindReplace(false);
         setShowAbout(false);
         setShowShortcuts(false);
         setShowPreferences(false);
       }
+      // Reset Ctrl+K if another key is pressed
+      else if (ctrlKPressed && !(e.ctrlKey && e.key === 's')) {
+        setCtrlKPressed(false);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo, handleSelectFile, handleCloseFile]);
+  }, [ctrlKPressed, handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo, handleSelectFile, handleCloseFile, showTerminal]);
+
+  // Resizable left panel
+  const handleLeftPanelResize = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const startX = e.clientX;
+    const startWidth = leftPanelWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const nextWidth = Math.min(Math.max(startWidth + delta, 180), 520);
+      setLeftPanelWidth(nextWidth);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [leftPanelWidth]);
 
   const handleFileTreeContextMenu = useCallback((node: TreeNode, action: string) => {
     switch (action) {
@@ -453,16 +619,41 @@ function App() {
           .catch(err => console.error('Failed to copy path:', err));
         break;
       case 'rename':
-        console.log('Rename not implemented yet:', node.name);
+        {
+          const newName = prompt(`Rename "${node.name}" to:`, node.name);
+          if (newName && newName !== node.name && newName.trim()) {
+            invoke('rename_file_or_folder', { old_path: node.path, new_name: newName })
+              .then(() => {
+                showToast(`Renamed to "${newName}"`, "success");
+                // Refresh the parent folder to show renamed item
+                refreshFolder(getParentPath(node.path));
+              })
+              .catch(err => {
+                console.error('Failed to rename:', err);
+                showToast(`Failed to rename: ${err}`, "error");
+              });
+          }
+        }
         break;
       case 'delete':
         if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
           invoke('delete_file_or_folder', { path: node.path })
             .then(() => {
-              // Refresh folder tree
-              handleOpenFolder();
+              // Close the file if it was open
+              if (node.type === 'file') {
+                setOpenFiles(prev => prev.filter(f => f.id !== node.id));
+                if (activeFileId === node.id) {
+                  setActiveFileId(null);
+                }
+              }
+              showToast(`Deleted "${node.name}"`, "success");
+              // Refresh the parent folder to remove deleted item
+              refreshFolder(getParentPath(node.path));
             })
-            .catch(err => console.error('Failed to delete:', err));
+            .catch(err => {
+              console.error('Failed to delete:', err);
+              showToast(`Failed to delete: ${err}`, "error");
+            });
         }
         break;
       case 'new-file':
@@ -472,79 +663,115 @@ function App() {
         console.log('New folder not implemented yet');
         break;
     }
-  }, [openFiles, activeFileId, editorState, handleSelectFile, handleOpenFolder]);
+  }, [openFiles, activeFileId, editorState, handleSelectFile, refreshFolder]);
 
   return (
-    <div className="app">
-      <div className="main-content">
-        <MenuBar
-          onNew={handleNewFile}
-          onOpen={handleOpenFile}
-          onSave={handleSaveFile}
-          onSaveAs={handleSaveFileAs}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onFindReplace={() => setShowFindReplace(true)}
-          onAbout={() => setShowAbout(true)}
-          onShortcuts={() => setShowShortcuts(true)}
-          onOpenFolder={handleOpenFolder}
-          onPreferences={() => setShowPreferences(true)}
-        />
-        {openFiles.length > 0 && (
-          <FileSidebar
-            files={openFiles}
-            onFileSelect={handleSelectFile}
-            onFileClose={handleCloseFile}
+    <div className="app-new-layout">
+      <Header
+        appName="Shinku 神紅"
+        appVersion="0.1.0"
+        currentFile={editorState.title}
+        onAbout={() => setShowAbout(true)}
+        onSettings={() => setShowPreferences(true)}
+        onTerminal={() => setShowTerminal(!showTerminal)}
+        onShortcuts={() => setShowShortcuts(true)}
+        onNew={handleNewFile}
+        onOpen={handleOpenFile}
+        onOpenFolder={handleOpenFolder}
+        onSave={handleSaveFile}
+        onSaveAs={handleSaveFileAs}
+        onClose={handleCloseAll}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+      />
+      
+      <div className="main-layout">
+        <div
+          className={`sidebar-drawer ${sidebarActive || searchActive ? 'expanded' : 'collapsed'}`}
+          style={{ width: sidebarActive || searchActive ? `${leftPanelWidth + 50}px` : '50px' }}
+        >
+          <Sidebar
+            onToggleExplorer={() => {
+              setSidebarActive(!sidebarActive);
+              setSearchActive(false);
+            }}
+            onToggleSearch={() => {
+              setSearchActive(!searchActive);
+              setSidebarActive(false);
+            }}
+            explorerActive={sidebarActive}
+            searchActive={searchActive}
           />
-        )}
-        <div className="editor-wrapper">
-          {showFileTree && folderTree.length > 0 && (
-            <FileTree
-              nodes={folderTree}
-              folderPath={currentFolderPath}
-              activeFilePath={activeFileId || undefined}
-              onFileSelect={(node) => {
-                if (node.type === 'file') {
-                  // Call the handler to open file from specific path
-                  handleOpenFileFromPath(node.path, node.name);
-                }
-              }}
-              onContextMenu={(node, action) => {
-                handleFileTreeContextMenu(node, action);
-              }}
-              onCreateFile={async (parentPath: string, fileName: string) => {
-                if (!fileName.trim() || !parentPath) return;
-                try {
-                  await invoke('create_file', { 
-                    parentPath, 
-                    fileName 
-                  });
-                  await refreshFolderTree();
-                } catch (error) {
-                  console.error('Failed to create file:', error);
-                  alert('Failed to create file: ' + error);
-                }
-              }}
-              onCreateFolder={async (parentPath: string, folderName: string) => {
-                if (!folderName.trim() || !parentPath) return;
-                try {
-                  await invoke('create_folder', { 
-                    parentPath, 
-                    folderName 
-                  });
-                  await refreshFolderTree();
-                } catch (error) {
-                  console.error('Failed to create folder:', error);
-                  alert('Failed to create folder: ' + error);
-                }
-              }}
+
+          <div className="sidebar-content" style={{ display: sidebarActive || searchActive ? 'flex' : 'none' }}>
+            {searchActive ? (
+              <SearchPanel isOpen={searchActive} />
+            ) : sidebarActive ? (
+              <FileTree
+                nodes={folderTree.length ? folderTree : openFiles.map(f => ({
+                  id: f.id,
+                  name: f.name,
+                  type: 'file',
+                  path: f.path || f.id,
+                }))}
+                folderPath={currentFolderPath}
+                activeFilePath={activeFileId || undefined}
+                onOpenFile={handleOpenFile}
+                onOpenFolder={handleOpenFolder}
+                onFileSelect={(node) => {
+                  if (node.type === 'file') {
+                    handleOpenFileFromPath(node.path, node.name);
+                  }
+                }}
+                onContextMenu={(node, action) => {
+                  handleFileTreeContextMenu(node, action);
+                }}
+                onCreateFile={async (parentPath: string, fileName: string) => {
+                  if (!fileName.trim() || !parentPath) return;
+
+                  const parentNode = folderTree.find(node => node.path === parentPath);
+                  const existsInParent = parentNode?.children?.some(child => child.name === fileName);
+                  if (existsInParent) {
+                    showToast(`A file named "${fileName}" already exists in this folder`, "warning");
+                    return;
+                  }
+
+                  await invoke('create_file', { path: `${parentPath}/${fileName}` });
+                  await refreshFolder(parentPath);
+                }}
+                onCreateFolder={async (parentPath: string, folderName: string) => {
+                  if (!folderName.trim() || !parentPath) return;
+
+                  const parentNode = folderTree.find(node => node.path === parentPath);
+                  const existsInParent = parentNode?.children?.some(child => child.name === folderName);
+                  if (existsInParent) {
+                    showToast(`A folder named "${folderName}" already exists in this folder`, "warning");
+                    return;
+                  }
+
+                  await invoke('create_folder', { path: `${parentPath}/${folderName}` });
+                  await refreshFolder(parentPath);
+                }}
+              />
+            ) : null}
+          </div>
+        </div>
+        <div
+          className="sidebar-resizer"
+          style={{ display: sidebarActive || searchActive ? 'block' : 'none' }}
+          onMouseDown={handleLeftPanelResize}
+        />
+
+        <div className="editor-main">
+          {openFiles.length > 1 && (
+            <FileSidebar
+              files={openFiles}
+              onFileSelect={handleSelectFile}
+              onFileClose={handleCloseFile}
             />
           )}
+          
           <div className="editor-container">
-            <FileHeader
-              title={editorState.title}
-              isModified={editorState.is_modified}
-            />
             <Editor
               content={editorState.content}
               onChange={handleContentChange}
@@ -557,9 +784,17 @@ function App() {
               isModified={editorState.is_modified}
               filePath={editorState.title}
             />
+            {showTerminal && (
+              <Terminal
+                isOpen={showTerminal}
+                currentFilePath={editorState.title}
+                onClose={() => setShowTerminal(false)}
+              />
+            )}
           </div>
         </div>
       </div>
+      
       <FindReplace 
         isOpen={showFindReplace} 
         onClose={() => setShowFindReplace(false)} 
@@ -586,7 +821,14 @@ function App() {
           </div>
         </div>
       )}
-```
+      <UnsavedChangesDialog
+        isOpen={showUnsavedDialog}
+        files={unsavedFiles.map(f => ({ id: f.id, name: f.name }))}
+        onSaveSelected={saveSelectedFiles}
+        onDontSave={dontSaveAndClose}
+        onCancel={() => setShowUnsavedDialog(false)}
+      />
+      <Toast toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

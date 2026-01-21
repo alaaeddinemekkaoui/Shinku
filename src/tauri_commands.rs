@@ -180,28 +180,31 @@ pub async fn open_folder(state: State<'_, AppState>) -> Result<FolderTreeRespons
 }
 
 #[tauri::command]
-pub fn refresh_folder_tree(state: State<AppState>) -> Result<FolderTreeResponse, String> {
+pub fn refresh_folder_tree(path: Option<String>, state: State<AppState>) -> Result<FolderTreeResponse, String> {
     let controller = state.controller.lock().map_err(|e| e.to_string())?;
     
-    // Get the current folder from the controller
-    if let Some(folder_path) = controller.current_folder() {
-        let folder_path_clone = folder_path.clone();
-        let path_str = folder_path_clone.display().to_string();
-        
-        // Generate directory tree
-        let tree = controller.get_directory_tree(&folder_path_clone)
-            .map_err(|e| e.to_string())?;
-        
-        Ok(FolderTreeResponse {
-            folder_path: path_str,
-            entries: tree,
-        })
+    // Use provided path or fall back to controller's current folder
+    let folder_path = if let Some(p) = path {
+        PathBuf::from(p)
+    } else if let Some(folder_path) = controller.current_folder() {
+        folder_path.clone()
     } else {
-        Ok(FolderTreeResponse {
+        return Ok(FolderTreeResponse {
             folder_path: String::new(),
             entries: Vec::new(),
-        })
-    }
+        });
+    };
+    
+    let path_str = folder_path.display().to_string();
+    
+    // Generate directory tree
+    let tree = controller.get_directory_tree(&folder_path)
+        .map_err(|e| e.to_string())?;
+    
+    Ok(FolderTreeResponse {
+        folder_path: path_str,
+        entries: tree,
+    })
 }
 
 #[tauri::command]
@@ -299,6 +302,24 @@ pub async fn delete_file_or_folder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn rename_file_or_folder(old_path: String, new_name: String) -> Result<(), String> {
+    let old_path_buf = PathBuf::from(&old_path);
+    
+    // Get the parent directory
+    let parent = old_path_buf.parent()
+        .ok_or("Cannot get parent directory".to_string())?.to_path_buf();
+    
+    // Create new path with new name
+    let new_path = parent.join(&new_name);
+    
+    // Rename the file or folder
+    std::fs::rename(&old_path_buf, &new_path)
+        .map_err(|e| format!("Failed to rename: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
 pub fn undo(state: State<AppState>) -> Result<EditorState, String> {
     let mut controller = state.controller.lock().map_err(|e| e.to_string())?;
     controller.undo().map_err(|e| e.to_string())?;
@@ -336,4 +357,80 @@ pub fn get_app_info() -> AppInfoData {
         repository: app_info::REPOSITORY.to_string(),
         faq: info.faq.iter().map(|(q, a)| (q.to_string(), a.to_string())).collect(),
     }
+}
+
+#[tauri::command]
+pub async fn execute_terminal_command(command: String, working_dir: String) -> Result<String, String> {
+    use std::process::Command;
+    
+    let working_path = if working_dir.is_empty() {
+        std::env::current_dir().map_err(|e| e.to_string())?
+    } else {
+        PathBuf::from(&working_dir)
+    };
+    
+    // Determine shell based on OS
+    #[cfg(target_os = "windows")]
+    let (shell, args) = ("cmd.exe", vec!["/C", &command]);
+    
+    #[cfg(not(target_os = "windows"))]
+    let (shell, args) = ("sh", vec!["-c", &command]);
+    
+    let output = Command::new(shell)
+        .args(&args)
+        .current_dir(&working_path)
+        .output()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    
+    if output.status.success() {
+        Ok(if stdout.is_empty() { "(command executed successfully)".to_string() } else { stdout })
+    } else {
+        Ok(if stderr.is_empty() { "(command failed)".to_string() } else { stderr })
+    }
+}
+
+#[tauri::command]
+pub async fn open_external_terminal(path: String) -> Result<(), String> {
+    use std::process::Command;
+    
+    let working_path = if path.is_empty() {
+        std::env::current_dir().map_err(|e| e.to_string())?
+    } else {
+        PathBuf::from(&path)
+    };
+    
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd.exe")
+            .args(&["/C", "start", "cmd.exe"])
+            .current_dir(&working_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!("tell application \"Terminal\" to do script \"cd '{}'\"", 
+            working_path.display());
+        Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .spawn()
+            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("x-terminal-emulator")
+            .current_dir(&working_path)
+            .spawn()
+            .or_else(|_| Command::new("gnome-terminal").current_dir(&working_path).spawn())
+            .or_else(|_| Command::new("xfce4-terminal").current_dir(&working_path).spawn())
+            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+    }
+    
+    Ok(())
 }

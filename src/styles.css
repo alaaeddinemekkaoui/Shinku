@@ -1,5 +1,6 @@
 @import './styles/themes.css';
 @import './styles/filestate.css';
+@import './styles/text-button.css';
 
 * {
   margin: 0;
@@ -173,8 +174,10 @@ body {
 /* File Sidebar */
 .file-sidebar {
   background: #1e1e1e;
-  border-bottom: 1px solid #454545;
+  border: none;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .file-tabs {
@@ -182,8 +185,28 @@ body {
   gap: 2px;
   padding: 0 4px;
   overflow-x: auto;
+  overflow-y: hidden;
   height: 35px;
   align-items: center;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a #1e1e1e;
+}
+
+.file-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.file-tabs::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.file-tabs::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+  border-radius: 3px;
+}
+
+.file-tabs::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .file-tab {
@@ -223,6 +246,7 @@ body {
 }
 
 .file-tab .close-btn {
+  display: flex;
   background: transparent;
   border: none;
   color: #858585;
@@ -372,15 +396,9 @@ body {
 
 /* Legacy menu section styles - cleaned up */
 
-/* File Header */
+/* File Header - Hidden */
 .file-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--accent-primary);
-  flex-shrink: 0;
+  display: none;
 }
 
 .file-title {
@@ -408,10 +426,7 @@ body {
 
 /* File Sidebar */
 .file-sidebar {
-  background: #1e1e1e;
-  border-bottom: 1px solid #454545;
-  flex-shrink: 0;
-  height: 35px;
+  display: flex;
 }
 
 .file-tabs {

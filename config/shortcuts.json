@@ -19,10 +19,12 @@
     { "action": "Select All", "shortcut": "Ctrl+A" }
   ],
   "view": [
+    { "action": "Terminal", "shortcut": "Ctrl+`" },
     { "action": "Toggle Line Numbers", "shortcut": "Ctrl+L" },
     { "action": "Zoom In", "shortcut": "Ctrl+=" },
     { "action": "Zoom Out", "shortcut": "Ctrl+-" },
-    { "action": "Reset Zoom", "shortcut": "Ctrl+0" }
+    { "action": "Reset Zoom", "shortcut": "Ctrl+0" },
+    { "action": "All Shortcuts", "shortcut": "Ctrl+K Ctrl+S" }
   ],
   "general": [
     { "action": "Command Palette", "shortcut": "Ctrl+Shift+P" },

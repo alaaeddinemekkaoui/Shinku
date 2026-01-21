@@ -39,7 +39,7 @@ fn main() {
     ).init();
 
     log::info!("╔═══════════════════════════════════════╗");
-    log::info!("║    SHINKU 神紅 TEXT EDITOR     ║");
+    log::info!("║       SHINKU TEXT EDITOR              ║");
     log::info!("║   From the ashes, rises simplicity    ║");
     log::info!("╚═══════════════════════════════════════╝");
     log::info!("");
@@ -55,15 +55,22 @@ fn main() {
             tauri_commands::get_editor_state,
             tauri_commands::new_file,
             tauri_commands::open_file,
+            tauri_commands::open_file_from_path,
             tauri_commands::save_file,
             tauri_commands::save_file_as,
             tauri_commands::insert_text,
             tauri_commands::open_folder,
+            tauri_commands::refresh_folder_tree,
+            tauri_commands::get_creation_folder,
             tauri_commands::create_file,
             tauri_commands::create_folder,
+            tauri_commands::delete_file_or_folder,
+            tauri_commands::rename_file_or_folder,
             tauri_commands::undo,
             tauri_commands::redo,
             tauri_commands::get_app_info,
+            tauri_commands::execute_terminal_command,
+            tauri_commands::open_external_terminal,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
