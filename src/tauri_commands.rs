@@ -121,6 +121,25 @@ pub async fn open_file_from_path(file_path: String, state: State<'_, AppState>) 
 }
 
 #[tauri::command]
+pub async fn open_multiple_files() -> Result<Vec<String>, String> {
+    use tauri::api::dialog::blocking::FileDialogBuilder;
+    
+    let files = FileDialogBuilder::new()
+        .add_filter("Text Files", &["txt", "md", "rs", "toml", "json", "js", "ts", "tsx", "jsx", "html", "css"])
+        .add_filter("All Files", &["*"])
+        .pick_files();
+    
+    if let Some(paths) = files {
+        let file_paths: Vec<String> = paths.iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        Ok(file_paths)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+#[tauri::command]
 pub async fn save_file(state: State<'_, AppState>) -> Result<EditorState, String> {
     let mut controller = state.controller.lock().map_err(|e| e.to_string())?;
     controller.save_file().map_err(|e| e.to_string())?;
@@ -176,6 +195,28 @@ pub async fn open_folder(state: State<'_, AppState>) -> Result<FolderTreeRespons
     Ok(FolderTreeResponse {
         folder_path: String::new(),
         entries: Vec::new(),
+    })
+}
+
+#[tauri::command]
+pub async fn open_folder_from_path(folder_path: String, state: State<'_, AppState>) -> Result<FolderTreeResponse, String> {
+    use std::path::PathBuf;
+    
+    let path = PathBuf::from(&folder_path);
+    if !path.exists() || !path.is_dir() {
+        return Err(format!("Path does not exist or is not a directory: {}", folder_path));
+    }
+    
+    let mut controller = state.controller.lock().map_err(|e| e.to_string())?;
+    controller.set_current_folder(path.clone());
+    
+    // Generate directory tree
+    let tree = controller.get_directory_tree(&path)
+        .map_err(|e| e.to_string())?;
+    
+    Ok(FolderTreeResponse {
+        folder_path,
+        entries: tree,
     })
 }
 

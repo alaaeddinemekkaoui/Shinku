@@ -1,4 +1,16 @@
 {
+  "header": {
+    "logo": "/icons/shinku.png",
+    "appName": "Shinku",
+    "version": "0.1.0",
+    "githubRepo": "https://github.com/alaaeddinemekkaoui/Shinku"
+  },
+  "welcome": {
+    "japaneseText": "神紅",
+    "englishTitle": "Shinku",
+    "description": "From the ashes of complexity, rises simplicity",
+    "logo": "/icons/shinku.png"
+  },
   "app": {
     "name": "Shinku 神紅 Editor",
     "version": "0.1.0",

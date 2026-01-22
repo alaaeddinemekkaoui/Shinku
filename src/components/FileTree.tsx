@@ -22,6 +22,7 @@ interface FileTreeProps {
   activeFilePath?: string;
   onOpenFile?: () => void;
   onOpenFolder?: () => void;
+  workspaceMode?: 'folder' | 'files' | null; // 'folder' = full, 'files' = files only, null = no workspace
 }
 
 interface ContextMenu {
@@ -41,6 +42,7 @@ const FileTree: React.FC<FileTreeProps> = ({
   activeFilePath,
   onOpenFile,
   onOpenFolder,
+  workspaceMode,
 }) => {
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -141,8 +143,17 @@ const FileTree: React.FC<FileTreeProps> = ({
   };
 
   const handleCreateFile = () => {
-    setCreatingFile(true);
-    setCreatingName("");
+    const fileName = prompt('Enter filename with extension (e.g., index.js, style.css):');
+    if (!fileName?.trim()) return;
+
+    let parentPath = folderPath || '';
+    
+    if (!parentPath) {
+      // No folder open - use the filename as is for Untitled creation
+      onCreateFile?.(parentPath, fileName.trim());
+    } else {
+      onCreateFile?.(parentPath, fileName.trim());
+    }
   };
 
   const handleCreateFolder = () => {
@@ -247,7 +258,10 @@ const FileTree: React.FC<FileTreeProps> = ({
   };
 
   const getFolderName = () => {
-    if (!folderPath) return 'No Folder';
+    if (!folderPath) {
+      const openFileCount = nodes.filter(n => n.type === 'file').length;
+      return openFileCount > 0 ? `${openFileCount} file${openFileCount !== 1 ? 's' : ''}` : 'No Folder';
+    }
     const parts = folderPath.replace(/\\/g, '/').split('/');
     return parts[parts.length - 1] || folderPath;
   };
@@ -258,24 +272,24 @@ const FileTree: React.FC<FileTreeProps> = ({
         <span className="file-tree-folder-name" title={folderPath}>
           {getFolderName()}
         </span>
-        {nodes.length > 0 && (
-          <div className="file-tree-actions">
-            <button 
-              className="file-tree-action-btn" 
-              title="New File"
-              onClick={handleCreateFile}
-            >
-              +
-            </button>
+        <div className="file-tree-actions">
+          <button 
+            className="file-tree-action-btn" 
+            title="New File"
+            onClick={handleCreateFile}
+          >
+            +
+          </button>
+          {folderPath && workspaceMode !== 'files' && nodes.length > 0 && (
             <button 
               className="file-tree-action-btn" 
               title="New Folder"
               onClick={handleCreateFolder}
             >
-              +
+              📁
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       {(creatingFile || creatingFolder) && (
         <div className="file-tree-create-input">
@@ -314,9 +328,15 @@ const FileTree: React.FC<FileTreeProps> = ({
                 className="empty-action-btn-compact" 
                 onClick={(e) => {
                   e.stopPropagation();
-                  const fileName = prompt('File name:');
-                  if (fileName?.trim() && folderPath) {
-                    onCreateFile?.(folderPath, fileName.trim());
+                  const fileName = prompt('Enter filename (e.g., index.js, README.md):');
+                  if (fileName?.trim()) {
+                    // If no folder is open, create as Untitled
+                    if (!folderPath) {
+                      // Trigger new file creation with Untitled naming
+                      onCreateFile?.(folderPath || '', `Untitled-${Date.now()}.${fileName.trim().split('.').pop() || 'txt'}`);
+                    } else {
+                      onCreateFile?.(folderPath, fileName.trim());
+                    }
                   }
                 }}
               >
@@ -362,13 +382,17 @@ const FileTree: React.FC<FileTreeProps> = ({
           {contextMenu.node.type === 'folder' && (
             <>
               <hr className="context-menu-divider" />
-              <div className="context-menu-item" onClick={() => handleContextMenuAction('new-file')}>
-                New File
-              </div>
-              <div className="context-menu-item" onClick={() => handleContextMenuAction('new-folder')}>
-                New Folder
-              </div>
-              <hr className="context-menu-divider" />
+              {folderPath && workspaceMode !== 'files' && (
+                <>
+                  <div className="context-menu-item" onClick={() => handleContextMenuAction('new-file')}>
+                    New File
+                  </div>
+                  <div className="context-menu-item" onClick={() => handleContextMenuAction('new-folder')}>
+                    New Folder
+                  </div>
+                  <hr className="context-menu-divider" />
+                </>
+              )}
               <div className="context-menu-item" onClick={() => handleContextMenuAction('rename')}>
                 Rename
               </div>

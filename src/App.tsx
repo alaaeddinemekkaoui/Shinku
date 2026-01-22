@@ -13,6 +13,7 @@ import Sidebar from "./components/Sidebar";
 import SearchPanel from "./components/SearchPanel";
 import Header from "./components/Header";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
+import WelcomePage from "./components/WelcomePage";
 import "./styles/app-new-layout.css";
 
 interface EditorState {
@@ -74,9 +75,10 @@ function App() {
   const [folderTree, setFolderTree] = useState<TreeNode[]>([]);
   const [currentFolderPath, setCurrentFolderPath] = useState<string>("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [workspaceMode, setWorkspaceMode] = useState<'folder' | 'files' | null>(null); // 'folder' = full workspace, 'files' = files only
   
   // UI state
-  const [sidebarActive, setSidebarActive] = useState(false);
+  const [sidebarActive, setSidebarActive] = useState(true);
   const [searchActive, setSearchActive] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(() => {
@@ -428,6 +430,61 @@ function App() {
     }
   }, [showToast]);
 
+  const handleOpenFolderFromPath = useCallback(async (folderPath: string) => {
+    try {
+      const response = await invoke<FolderTreeResponse>('open_folder_from_path', { folderPath });
+      if (!response || !response.folder_path) {
+        console.error('Failed to open folder from path');
+        return;
+      }
+      setCurrentFolderPath(response.folder_path);
+      setFolderTree(convertToTreeNodes(response.entries));
+      setWorkspaceMode('folder');
+      showToast(`Opened folder: ${response.folder_path}`, "success");
+    } catch (error) {
+      console.error('Failed to open folder from path:', error);
+      showToast(`Failed to open folder: ${error}`, "error");
+    }
+  }, [showToast]);
+
+  const handleCreateFolderWorkspace = useCallback(async () => {
+    try {
+      // Use open folder dialog to let user pick/create location
+      const response = await invoke<FolderTreeResponse>('open_folder');
+      if (!response || !response.folder_path) {
+        console.error('No folder selected');
+        return;
+      }
+      setCurrentFolderPath(response.folder_path);
+      setFolderTree(convertToTreeNodes(response.entries));
+      setWorkspaceMode('folder');
+      showToast(`Created folder workspace: ${response.folder_path}`, "success");
+    } catch (error) {
+      console.error('Failed to create folder workspace:', error);
+      showToast(`Failed to create workspace: ${error}`, "error");
+    }
+  }, [showToast]);
+
+  const handleCreateFilesWorkspace = useCallback(async () => {
+    try {
+      // Open file picker for multiple files
+      const files = await invoke<string[]>('open_multiple_files');
+      if (!files || files.length === 0) {
+        console.error('No files selected');
+        return;
+      }
+
+      // Set workspace mode to files-only first
+      setWorkspaceMode('files');
+      setCurrentFolderPath(''); // No folder in files-only workspace
+      
+      showToast(`Files workspace created with ${files.length} file(s)`, "success");
+    } catch (error) {
+      console.error('Failed to create files workspace:', error);
+      showToast(`Failed to create workspace: ${error}`, "error");
+    }
+  }, [showToast]);
+
   // Update a specific node's children in the folder tree
   const updateTreeWithFolderEntries = (nodes: TreeNode[], targetPath: string, entries: DirectoryEntry[]): TreeNode[] => {
     return nodes.map(node => {
@@ -668,9 +725,6 @@ function App() {
   return (
     <div className="app-new-layout">
       <Header
-        appName="Shinku 神紅"
-        appVersion="0.1.0"
-        currentFile={editorState.title}
         onAbout={() => setShowAbout(true)}
         onSettings={() => setShowPreferences(true)}
         onTerminal={() => setShowTerminal(!showTerminal)}
@@ -718,6 +772,7 @@ function App() {
                 activeFilePath={activeFileId || undefined}
                 onOpenFile={handleOpenFile}
                 onOpenFolder={handleOpenFolder}
+                workspaceMode={workspaceMode}
                 onFileSelect={(node) => {
                   if (node.type === 'file') {
                     handleOpenFileFromPath(node.path, node.name);
@@ -772,24 +827,42 @@ function App() {
           )}
           
           <div className="editor-container">
-            <Editor
-              content={editorState.content}
-              onChange={handleContentChange}
-              onCursorChange={handleCursorChange}
-            />
-            <StatusBar
-              line={cursorPos.line}
-              column={cursorPos.column}
-              lineCount={editorState.line_count}
-              isModified={editorState.is_modified}
-              filePath={editorState.title}
-            />
-            {showTerminal && (
-              <Terminal
-                isOpen={showTerminal}
-                currentFilePath={editorState.title}
-                onClose={() => setShowTerminal(false)}
+            {openFiles.length === 0 && !currentFolderPath ? (
+              <WelcomePage
+                onOpenFile={handleOpenFile}
+                onOpenFolder={handleOpenFolder}
+                onOpenRecent={(path) => {
+                  if (path.endsWith('.md') || path.endsWith('.txt') || path.endsWith('.js') || path.endsWith('.ts') || path.endsWith('.tsx') || path.endsWith('.jsx')) {
+                    handleOpenFileFromPath(path, path.split('/').pop() || path);
+                  } else {
+                    handleOpenFolderFromPath(path);
+                  }
+                }}
+                onCreateFolderWorkspace={handleCreateFolderWorkspace}
+                onCreateFilesWorkspace={handleCreateFilesWorkspace}
               />
+            ) : (
+              <>
+                <Editor
+                  content={editorState.content}
+                  onChange={handleContentChange}
+                  onCursorChange={handleCursorChange}
+                />
+                <StatusBar
+                  line={cursorPos.line}
+                  column={cursorPos.column}
+                  lineCount={editorState.line_count}
+                  isModified={editorState.is_modified}
+                  filePath={editorState.title}
+                />
+                {showTerminal && (
+                  <Terminal
+                    isOpen={showTerminal}
+                    currentFilePath={editorState.title}
+                    onClose={() => setShowTerminal(false)}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
