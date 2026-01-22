@@ -16,6 +16,14 @@ interface WelcomeConfig {
   logo: string;
 }
 
+interface ActionCard {
+  icon: string;
+  title: string;
+  description: string;
+  shortcut?: string;
+  onClick: () => void;
+}
+
 interface WelcomePageProps {
   onOpenFile?: () => void;
   onOpenFolder?: () => void;
@@ -32,7 +40,6 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
   onCreateFilesWorkspace,
 }) => {
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
-  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [welcomeConfig, setWelcomeConfig] = useState<WelcomeConfig | null>(null);
 
   useEffect(() => {
@@ -91,14 +98,34 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
     }
   };
 
-  const handleWorkspaceAction = (action: 'folder' | 'files') => {
-    setShowWorkspaceMenu(false);
-    if (action === 'folder') {
-      onCreateFolderWorkspace?.();
-    } else {
-      onCreateFilesWorkspace?.();
+  const actionCards: ActionCard[] = [
+    {
+      icon: 'description',
+      title: 'Open File',
+      description: 'Quick access to your files',
+      shortcut: 'Ctrl+O',
+      onClick: () => onOpenFile?.()
+    },
+    {
+      icon: 'folder_open',
+      title: 'Open Folder',
+      description: 'Browse and edit projects',
+      shortcut: 'Ctrl+Shift+O',
+      onClick: () => onOpenFolder?.()
+    },
+    {
+      icon: 'create_new_folder',
+      title: 'Folder Workspace',
+      description: 'Create organized workspace',
+      onClick: () => onCreateFolderWorkspace?.()
+    },
+    {
+      icon: 'library_books',
+      title: 'Files Workspace',
+      description: 'Work with multiple files',
+      onClick: () => onCreateFilesWorkspace?.()
     }
-  };
+  ];
 
   return (
     <div className="welcome-page">
@@ -118,48 +145,23 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
           </div>
         </div>
 
-        <div className="welcome-actions">
-          <button className="welcome-btn welcome-btn-primary" onClick={onOpenFile}>
-            <span className="btn-icon material-symbols-outlined">description</span>
-            <span className="btn-text">Open File</span>
-          </button>
-          <button className="welcome-btn welcome-btn-secondary" onClick={onOpenFolder}>
-            <span className="btn-icon material-symbols-outlined">folder_open</span>
-            <span className="btn-text">Open Folder</span>
-          </button>
-          <div className="welcome-workspace-menu">
+        <div className="welcome-actions-grid">
+          {actionCards.map((card, index) => (
             <button 
-              className="welcome-btn welcome-btn-secondary" 
-              onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
+              key={index}
+              className="action-card" 
+              onClick={card.onClick}
             >
-              <span className="btn-icon material-symbols-outlined">workspaces</span>
-              <span className="btn-text">New Workspace</span>
-            </button>
-            {showWorkspaceMenu && (
-              <div className="workspace-dropdown">
-                <div 
-                  className="workspace-option" 
-                  onClick={() => handleWorkspaceAction('folder')}
-                >
-                  <span className="option-icon material-symbols-outlined">create_new_folder</span>
-                  <div>
-                    <div className="option-title">Folder Workspace</div>
-                    <div className="option-desc">Create new folder with full file & folder management</div>
-                  </div>
-                </div>
-                <div 
-                  className="workspace-option" 
-                  onClick={() => handleWorkspaceAction('files')}
-                >
-                  <span className="option-icon material-symbols-outlined">library_books</span>
-                  <div>
-                    <div className="option-title">Files Workspace</div>
-                    <div className="option-desc">Open multiple files from different locations</div>
-                  </div>
-                </div>
+              <span className="action-card-icon material-symbols-outlined">{card.icon}</span>
+              <div className="action-card-content">
+                <h3 className="action-card-title">{card.title}</h3>
+                <p className="action-card-description">{card.description}</p>
+                {card.shortcut && (
+                  <span className="action-card-shortcut">{card.shortcut}</span>
+                )}
               </div>
-            )}
-          </div>
+            </button>
+          ))}
         </div>
 
         {recentItems.length > 0 && (

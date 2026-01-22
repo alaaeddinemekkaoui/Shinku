@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
-import Editor from "./components/Editor";
+import Editor, { EditorHandle } from "./components/Editor";
 import StatusBar from "./components/StatusBar";
 import FindReplace from "./components/FindReplace";
 import AboutDialog from "./components/AboutDialog";
@@ -14,6 +14,7 @@ import SearchPanel from "./components/SearchPanel";
 import Header from "./components/Header";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import WelcomePage from "./components/WelcomePage";
+import CommandPalette from "./components/CommandPalette";
 import "./styles/app-new-layout.css";
 
 interface EditorState {
@@ -68,6 +69,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [openFiles, setOpenFiles] = useState<FileTab[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -76,6 +78,7 @@ function App() {
   const [currentFolderPath, setCurrentFolderPath] = useState<string>("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [workspaceMode, setWorkspaceMode] = useState<'folder' | 'files' | null>(null); // 'folder' = full workspace, 'files' = files only
+  const editorRef = useRef<EditorHandle | null>(null);
   
   // UI state
   const [sidebarActive, setSidebarActive] = useState(true);
@@ -87,6 +90,11 @@ function App() {
     return Math.min(Math.max(width, 180), 520);
   });
   const [ctrlKPressed, setCtrlKPressed] = useState(false);
+  const [autoSaveEnabled] = useState(() => {
+    const saved = localStorage.getItem('shinku-autosave');
+    return saved ? JSON.parse(saved) : true;
+  });
+  const autoSaveTimerRef = useRef<number | null>(null);
 
   // Toast helper function
   const showToast = useCallback((message: string, type: "success" | "error" | "info" | "warning" = "info", duration = 3000) => {
@@ -221,10 +229,37 @@ function App() {
         }
       }));
     }
-  }, [activeFileId, editorState]);
+
+    // Auto-save trigger
+    if (autoSaveEnabled && activeFileId) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setTimeout(() => {
+        const file = openFiles.find(f => f.id === activeFileId);
+        if (file && file.path && file.path !== 'Untitled') {
+          handleSaveFile();
+        }
+      }, 2000); // Auto-save after 2 seconds of inactivity
+    }
+  }, [activeFileId, editorState, autoSaveEnabled, openFiles, handleSaveFile]);
 
   const handleCursorChange = useCallback((line: number, column: number) => {
     setCursorPos({ line, column });
+  }, []);
+
+  const addToRecentFiles = useCallback((path: string, name: string, type: 'file' | 'folder') => {
+    const recentItems = JSON.parse(localStorage.getItem('shinku-recent-items') || '[]');
+    const newItem = {
+      id: path,
+      name,
+      type,
+      path,
+      lastOpened: Date.now()
+    };
+    const filtered = recentItems.filter((item: any) => item.path !== path);
+    filtered.unshift(newItem);
+    localStorage.setItem('shinku-recent-items', JSON.stringify(filtered.slice(0, 10)));
   }, []);
 
   const handleNewFile = useCallback(async () => {
@@ -292,11 +327,14 @@ function App() {
         setFileContents(prev => ({ ...prev, [fileId]: state }));
         setActiveFileId(fileId);
       }
+      
+      // Add to recent files
+      addToRecentFiles(filePath, fileName, 'file');
     } catch (error) {
       console.error("Failed to open file from path:", error);
       alert("Failed to open file: " + error);
     }
-  }, [openFiles, activeFileId, handleSaveFile]);
+  }, [openFiles, activeFileId, handleSaveFile, addToRecentFiles]);
 
   const handleOpenFile = useCallback(async () => {
     // Check if active file has unsaved changes
@@ -340,10 +378,213 @@ function App() {
         setFileContents(prev => ({ ...prev, [fileId]: state }));
         setActiveFileId(fileId);
       }
+      
+      // Add to recent files
+      addToRecentFiles(state.title, newFile.name, 'file');
     } catch (error) {
       console.error("Failed to open file:", error);
     }
-  }, [openFiles, activeFileId, handleSaveFile]);
+  }, [openFiles, activeFileId, handleSaveFile, addToRecentFiles]);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await editorRef.current?.copy();
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  }, []);
+
+  const handleCut = useCallback(async () => {
+    try {
+      await editorRef.current?.cut();
+    } catch (error) {
+      console.error("Failed to cut:", error);
+    }
+  }, []);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      await editorRef.current?.paste();
+    } catch (error) {
+      console.error("Failed to paste:", error);
+    }
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    try {
+      editorRef.current?.selectAll();
+    } catch (error) {
+      console.error("Failed to select all:", error);
+    }
+  }, []);
+
+  const handleFind = useCallback(() => {
+    setShowFindReplace(true);
+  }, []);
+
+  const handleGoToLine = useCallback(() => {
+    const lineNum = prompt("Go to line number:");
+    if (lineNum) {
+      const num = parseInt(lineNum, 10);
+      if (!isNaN(num) && num > 0) {
+        showToast(`Go to line ${num} feature coming soon`, "info");
+      }
+    }
+  }, [showToast]);
+
+  const handleFormatDocument = useCallback(() => {
+    showToast("Format document feature coming soon", "info");
+  }, [showToast]);
+
+  const buildCommands = useCallback(() => {
+    return [
+      {
+        id: "cmd-new",
+        label: "New File",
+        description: "Create a new untitled file",
+        category: "File",
+        icon: "add_note",
+        shortcut: "Ctrl+N",
+        action: handleNewFile
+      },
+      {
+        id: "cmd-open",
+        label: "Open File",
+        description: "Open an existing file",
+        category: "File",
+        icon: "folder_open",
+        shortcut: "Ctrl+O",
+        action: handleOpenFile
+      },
+      {
+        id: "cmd-open-folder",
+        label: "Open Folder",
+        description: "Open a folder as workspace",
+        category: "File",
+        icon: "folder",
+        shortcut: "Ctrl+Shift+O",
+        action: handleOpenFolder
+      },
+      {
+        id: "cmd-save",
+        label: "Save File",
+        description: "Save the current file",
+        category: "File",
+        icon: "save",
+        shortcut: "Ctrl+S",
+        action: handleSaveFile
+      },
+      {
+        id: "cmd-save-as",
+        label: "Save As",
+        description: "Save file with a new name",
+        category: "File",
+        icon: "save_as",
+        shortcut: "Ctrl+Shift+S",
+        action: handleSaveFileAs
+      },
+      {
+        id: "cmd-copy",
+        label: "Copy",
+        description: "Copy selected text to clipboard",
+        category: "Edit",
+        icon: "content_copy",
+        shortcut: "Ctrl+C",
+        action: handleCopy
+      },
+      {
+        id: "cmd-cut",
+        label: "Cut",
+        description: "Cut selected text to clipboard",
+        category: "Edit",
+        icon: "content_cut",
+        shortcut: "Ctrl+X",
+        action: handleCut
+      },
+      {
+        id: "cmd-paste",
+        label: "Paste",
+        description: "Paste from clipboard",
+        category: "Edit",
+        icon: "content_paste",
+        shortcut: "Ctrl+V",
+        action: handlePaste
+      },
+      {
+        id: "cmd-select-all",
+        label: "Select All",
+        description: "Select entire document",
+        category: "Edit",
+        icon: "select_all",
+        shortcut: "Ctrl+A",
+        action: handleSelectAll
+      },
+      {
+        id: "cmd-find",
+        label: "Find",
+        description: "Open find and replace",
+        category: "Edit",
+        icon: "search",
+        shortcut: "Ctrl+F",
+        action: handleFind
+      },
+      {
+        id: "cmd-undo",
+        label: "Undo",
+        description: "Undo last change",
+        category: "Edit",
+        icon: "undo",
+        shortcut: "Ctrl+Z",
+        action: handleUndo
+      },
+      {
+        id: "cmd-redo",
+        label: "Redo",
+        description: "Redo last undone change",
+        category: "Edit",
+        icon: "redo",
+        shortcut: "Ctrl+Y",
+        action: handleRedo
+      },
+      {
+        id: "cmd-terminal",
+        label: "Toggle Terminal",
+        description: "Show or hide terminal",
+        category: "View",
+        icon: "terminal",
+        shortcut: "Ctrl+`",
+        action: () => setShowTerminal(!showTerminal)
+      },
+      {
+        id: "cmd-shortcuts",
+        label: "All Shortcuts",
+        description: "Show keyboard shortcuts",
+        category: "Help",
+        icon: "keyboard",
+        shortcut: "Ctrl+K Ctrl+S",
+        action: () => setShowShortcuts(true)
+      },
+      {
+        id: "cmd-preferences",
+        label: "Preferences",
+        description: "Open settings",
+        category: "Help",
+        icon: "settings",
+        shortcut: "Ctrl+,",
+        action: () => setShowPreferences(true)
+      },
+      {
+        id: "cmd-about",
+        label: "About",
+        description: "About Shinku Editor",
+        category: "Help",
+        icon: "info",
+        action: () => setShowAbout(true)
+      }
+    ];
+  }, [showTerminal]);
+
+  // Build commands array for command palette
 
   const handleUndo = useCallback(async () => {
     try {
@@ -424,11 +665,15 @@ function App() {
       setCurrentFolderPath(response.folder_path);
       setFolderTree(convertToTreeNodes(response.entries));
       showToast(`Opened folder: ${response.folder_path}`, "success");
+      
+      // Add to recent files
+      const folderName = response.folder_path.split(/[/\\]/).pop() || 'Unknown Folder';
+      addToRecentFiles(response.folder_path, folderName, 'folder');
     } catch (error) {
       console.error('Failed to open folder:', error);
       showToast(`Failed to open folder: ${error}`, "error");
     }
-  }, [showToast]);
+  }, [showToast, addToRecentFiles]);
 
   const handleOpenFolderFromPath = useCallback(async (folderPath: string) => {
     try {
@@ -441,11 +686,15 @@ function App() {
       setFolderTree(convertToTreeNodes(response.entries));
       setWorkspaceMode('folder');
       showToast(`Opened folder: ${response.folder_path}`, "success");
+      
+      // Add to recent files
+      const folderName = response.folder_path.split(/[/\\]/).pop() || 'Unknown Folder';
+      addToRecentFiles(response.folder_path, folderName, 'folder');
     } catch (error) {
       console.error('Failed to open folder from path:', error);
       showToast(`Failed to open folder: ${error}`, "error");
     }
-  }, [showToast]);
+  }, [showToast, addToRecentFiles]);
 
   const handleCreateFolderWorkspace = useCallback(async () => {
     try {
@@ -459,11 +708,15 @@ function App() {
       setFolderTree(convertToTreeNodes(response.entries));
       setWorkspaceMode('folder');
       showToast(`Created folder workspace: ${response.folder_path}`, "success");
+      
+      // Add to recent files
+      const folderName = response.folder_path.split(/[/\\]/).pop() || 'Unknown Folder';
+      addToRecentFiles(response.folder_path, folderName, 'folder');
     } catch (error) {
       console.error('Failed to create folder workspace:', error);
       showToast(`Failed to create workspace: ${error}`, "error");
     }
-  }, [showToast]);
+  }, [showToast, addToRecentFiles]);
 
   const handleCreateFilesWorkspace = useCallback(async () => {
     try {
@@ -569,6 +822,21 @@ function App() {
         e.preventDefault();
         handleOpenFile();
       }
+      // Ctrl+V - Paste
+      else if (e.ctrlKey && e.key === 'v') {
+        e.preventDefault();
+        handlePaste();
+      }
+      // Ctrl+C - Copy
+      else if (e.ctrlKey && e.key === 'c') {
+        e.preventDefault();
+        handleCopy();
+      }
+      // Ctrl+X - Cut
+      else if (e.ctrlKey && e.key === 'x') {
+        e.preventDefault();
+        handleCut();
+      }
       // Ctrl+S - Save File
       else if (e.ctrlKey && e.key === 's' && !e.shiftKey) {
         e.preventDefault();
@@ -593,6 +861,11 @@ function App() {
       else if (e.ctrlKey && e.key === 'f') {
         e.preventDefault();
         setShowFindReplace(true);
+      }
+      // Ctrl+Shift+P - Command Palette
+      else if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        setShowCommandPalette(true);
       }
       // Ctrl+, - Preferences
       else if (e.ctrlKey && e.key === ',') {
@@ -621,7 +894,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [ctrlKPressed, handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo, handleSelectFile, handleCloseFile, showTerminal]);
+  }, [ctrlKPressed, handleNewFile, handleOpenFile, handlePaste, handleCopy, handleCut, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo, handleSelectFile, handleCloseFile, showTerminal]);
 
   // Resizable left panel
   const handleLeftPanelResize = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -732,11 +1005,19 @@ function App() {
         onNew={handleNewFile}
         onOpen={handleOpenFile}
         onOpenFolder={handleOpenFolder}
+        onCopy={handleCopy}
+        onCut={handleCut}
+        onPaste={handlePaste}
         onSave={handleSaveFile}
         onSaveAs={handleSaveFileAs}
         onClose={handleCloseAll}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onFind={handleFind}
+        onReplace={handleFind}
+        onSelectAll={handleSelectAll}
+        onGoToLine={handleGoToLine}
+        onFormatDocument={handleFormatDocument}
       />
       
       <div className="main-layout">
@@ -844,6 +1125,7 @@ function App() {
             ) : (
               <>
                 <Editor
+                  ref={editorRef}
                   content={editorState.content}
                   onChange={handleContentChange}
                   onCursorChange={handleCursorChange}
@@ -854,6 +1136,7 @@ function App() {
                   lineCount={editorState.line_count}
                   isModified={editorState.is_modified}
                   filePath={editorState.title}
+                  content={editorState.content}
                 />
                 {showTerminal && (
                   <Terminal
@@ -894,6 +1177,11 @@ function App() {
           </div>
         </div>
       )}
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        commands={buildCommands()}
+      />
       <UnsavedChangesDialog
         isOpen={showUnsavedDialog}
         files={unsavedFiles.map(f => ({ id: f.id, name: f.name }))}

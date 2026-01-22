@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { javascript } from "@codemirror/lang-javascript";
@@ -12,7 +12,15 @@ interface EditorProps {
   onCursorChange: (line: number, column: number) => void;
 }
 
-const Editor: React.FC<EditorProps> = ({ content, onChange, onCursorChange }) => {
+export interface EditorHandle {
+  copy: () => Promise<string | null>;
+  cut: () => Promise<string | null>;
+  paste: () => Promise<void>;
+  focus: () => void;
+  selectAll: () => void;
+  getSelection: () => { from: number; to: number; text: string };
+}
+const Editor = forwardRef<EditorHandle, EditorProps>(({ content, onChange, onCursorChange }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -60,6 +68,58 @@ const Editor: React.FC<EditorProps> = ({ content, onChange, onCursorChange }) =>
     };
   }, []);
 
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      viewRef.current?.focus();
+    },
+    copy: async () => {
+      const view = viewRef.current;
+      if (!view) return null;
+      const sel = view.state.selection.main;
+      const text = view.state.sliceDoc(sel.from, sel.to);
+      if (text) {
+        await navigator.clipboard.writeText(text);
+      }
+      return text || null;
+    },
+    cut: async () => {
+      const view = viewRef.current;
+      if (!view) return null;
+      const sel = view.state.selection.main;
+      const text = view.state.sliceDoc(sel.from, sel.to);
+      if (text) {
+        await navigator.clipboard.writeText(text);
+        view.dispatch({ changes: { from: sel.from, to: sel.to, insert: "" } });
+      }
+      return text || null;
+    },
+    paste: async () => {
+      const view = viewRef.current;
+      if (!view) return;
+      const clip = await navigator.clipboard.readText();
+      const sel = view.state.selection.main;
+      view.dispatch({ changes: { from: sel.from, to: sel.to, insert: clip } });
+    },
+    selectAll: () => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        selection: { anchor: 0, head: view.state.doc.length }
+      });
+      view.focus();
+    },
+    getSelection: () => {
+      const view = viewRef.current;
+      if (!view) return { from: 0, to: 0, text: '' };
+      const sel = view.state.selection.main;
+      return {
+        from: sel.from,
+        to: sel.to,
+        text: view.state.sliceDoc(sel.from, sel.to)
+      };
+    }
+  }), []);
+
   // Update content when it changes externally (e.g., file open)
   useEffect(() => {
     if (viewRef.current) {
@@ -87,6 +147,6 @@ const Editor: React.FC<EditorProps> = ({ content, onChange, onCursorChange }) =>
       }} 
     />
   );
-};
+});
 
 export default Editor;

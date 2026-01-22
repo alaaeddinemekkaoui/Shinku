@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { detectLanguage } from "../utils/languageDetector";
 
 interface StatusBarProps {
@@ -7,6 +7,7 @@ interface StatusBarProps {
   lineCount: number;
   isModified: boolean;
   filePath?: string;
+  content?: string;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -15,8 +16,16 @@ const StatusBar: React.FC<StatusBarProps> = ({
   lineCount,
   isModified,
   filePath = "Untitled",
+  content = "",
 }) => {
   const language = detectLanguage(filePath);
+  
+  const stats = useMemo(() => {
+    const words = content.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const chars = content.length;
+    const lines = lineCount;
+    return { words, chars, lines };
+  }, [content, lineCount]);
   
   return (
     <div className="status-bar">
@@ -34,7 +43,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <span className="status-item">
           <strong>Ln {line}</strong> | <strong>Col {column}</strong>
         </span>
-        <span className="status-item">{lineCount} lines</span>
+        <span className="status-item">{stats.lines} lines</span>
+        <span className="status-item">{stats.words} words</span>
+        <span className="status-item">{stats.chars} chars</span>
         <span className="status-item">
           <div
             className={`status-indicator ${isModified ? "modified" : "saved"}`}

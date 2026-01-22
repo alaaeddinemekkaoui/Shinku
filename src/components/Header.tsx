@@ -9,11 +9,19 @@ interface HeaderProps {
   onNew?: () => void;
   onOpen?: () => void;
   onOpenFolder?: () => void;
+  onCopy?: () => void;
+  onCut?: () => void;
+  onPaste?: () => void;
   onSave?: () => void;
   onSaveAs?: () => void;
   onClose?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onFind?: () => void;
+  onReplace?: () => void;
+  onSelectAll?: () => void;
+  onGoToLine?: () => void;
+  onFormatDocument?: () => void;
 }
 
 interface HeaderConfig {
@@ -31,11 +39,19 @@ const Header: React.FC<HeaderProps> = ({
   onNew,
   onOpen,
   onOpenFolder,
+  onCopy,
+  onCut,
+  onPaste,
   onSave,
   onSaveAs,
   onClose,
   onUndo,
   onRedo,
+  onFind,
+  onReplace,
+  onSelectAll,
+  onGoToLine,
+  onFormatDocument,
 }) => {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({
@@ -81,29 +97,29 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           {openMenu === "file" && (
             <div className="menu-dropdown">
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onNew)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onNew)}>
                 New File
                 <span className="menu-shortcut">Ctrl+N</span>
               </button>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onOpen)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onOpen)}>
                 Open File
                 <span className="menu-shortcut">Ctrl+O</span>
               </button>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onOpenFolder)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onOpenFolder)}>
                 Open Folder
                 <span className="menu-shortcut">Ctrl+Shift+O</span>
               </button>
               <div className="menu-divider"></div>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onSave)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onSave)}>
                 Save
                 <span className="menu-shortcut">Ctrl+S</span>
               </button>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onSaveAs)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onSaveAs)}>
                 Save As...
                 <span className="menu-shortcut">Ctrl+Shift+S</span>
               </button>
               <div className="menu-divider"></div>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onClose)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onClose)}>
                 Close
                 <span className="menu-shortcut">Ctrl+W</span>
               </button>
@@ -121,13 +137,48 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           {openMenu === "edit" && (
             <div className="menu-dropdown">
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onUndo)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onUndo)}>
                 Undo
                 <span className="menu-shortcut">Ctrl+Z</span>
               </button>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onRedo)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onRedo)}>
                 Redo
                 <span className="menu-shortcut">Ctrl+Y</span>
+              </button>
+              <div className="menu-divider"></div>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onCopy)}>
+                Copy
+                <span className="menu-shortcut">Ctrl+C</span>
+              </button>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onCut)}>
+                Cut
+                <span className="menu-shortcut">Ctrl+X</span>
+              </button>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onPaste)}>
+                Paste
+                <span className="menu-shortcut">Ctrl+V</span>
+              </button>
+              <div className="menu-divider"></div>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onFind)}>
+                Find
+                <span className="menu-shortcut">Ctrl+F</span>
+              </button>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onReplace)}>
+                Replace
+                <span className="menu-shortcut">Ctrl+H</span>
+              </button>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onGoToLine)}>
+                Go to Line
+                <span className="menu-shortcut">Ctrl+G</span>
+              </button>
+              <div className="menu-divider"></div>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onSelectAll)}>
+                Select All
+                <span className="menu-shortcut">Ctrl+A</span>
+              </button>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onFormatDocument)}>
+                Format Document
+                <span className="menu-shortcut">Shift+Alt+F</span>
               </button>
             </div>
           )}
@@ -143,12 +194,12 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           {openMenu === "view" && (
             <div className="menu-dropdown">
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onTerminal)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onTerminal)}>
                 Terminal
                 <span className="menu-shortcut">Ctrl+`</span>
               </button>
               <div className="menu-divider"></div>
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onShortcuts)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onShortcuts)}>
                 All Shortcuts
                 <span className="menu-shortcut">Ctrl+K Ctrl+S</span>
               </button>
@@ -166,7 +217,7 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           {openMenu === "settings" && (
             <div className="menu-dropdown">
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onSettings)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onSettings)}>
                 Preferences
                 <span className="menu-shortcut">Ctrl+,</span>
               </button>
@@ -184,12 +235,12 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           {openMenu === "help" && (
             <div className="menu-dropdown">
-              <button className="menu-dropdown-item" onClick={() => handleMenuItemClick(onAbout)}>
+              <button className="menu-dropdown-item" onMouseDown={() => handleMenuItemClick(onAbout)}>
                 About
               </button>
               <button
                 className="menu-dropdown-item"
-                onClick={() => {
+                onMouseDown={() => {
                   window.open(headerConfig.githubRepo, "_blank");
                   closeMenus();
                 }}
