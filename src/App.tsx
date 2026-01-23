@@ -71,6 +71,20 @@ function App() {
   const [showPreferences, setShowPreferences] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  
+  // Auto-save settings
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+    const saved = localStorage.getItem('shinku-autosave-enabled');
+    return saved === null ? true : saved === 'true';
+  });
+  const [autoSaveInterval, setAutoSaveInterval] = useState<number>(() => {
+    const saved = localStorage.getItem('shinku-autosave-interval');
+    return saved ? parseInt(saved, 10) : 5; // Default 5 minutes
+  });
+  const [autoSaveShownNotification, setAutoSaveShownNotification] = useState(() => {
+    const saved = localStorage.getItem('shinku-autosave-notification-shown');
+    return saved === 'true';
+  });
   const [openFiles, setOpenFiles] = useState<FileTab[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [fileContents, setFileContents] = useState<Record<string, EditorState>>({});
@@ -79,9 +93,73 @@ function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [workspaceMode, setWorkspaceMode] = useState<'folder' | 'files' | null>(null); // 'folder' = full workspace, 'files' = files only
   const editorRef = useRef<EditorHandle | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  
+  // Auto-save effect
+  useEffect(() => {
+    if (!autoSaveEnabled || !activeFileId) {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Show notification only once when auto-save is first enabled
+    if (!autoSaveShownNotification) {
+      showToast(`Auto-save activated (every ${autoSaveInterval} minutes)`, "success");
+      localStorage.setItem('shinku-autosave-notification-shown', 'true');
+      setAutoSaveShownNotification(true);
+    }
+
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearInterval(autoSaveTimerRef.current);
+    }
+
+    // Set up auto-save timer
+    autoSaveTimerRef.current = setInterval(async () => {
+      const activeFile = openFiles.find(f => f.id === activeFileId);
+      if (activeFile && activeFile.isModified && editorState.title !== "Untitled") {
+        try {
+          // Save current cursor position
+          const currentCursor = editorRef.current?.getCursorPos?.() || cursorPos;
+          
+          // Save the file without showing toast
+          const state = await invoke<EditorState>("save_file");
+          setEditorState({
+            ...state,
+            cursor_line: currentCursor.line,
+            cursor_column: currentCursor.column
+          });
+          
+          setOpenFiles(prev => prev.map(f =>
+            f.id === activeFileId
+              ? { ...f, isModified: false, isSaved: true, name: state.title.split('/').pop() || state.title }
+              : f
+          ));
+          
+          // Restore cursor position after a brief delay
+          setTimeout(() => {
+            if (editorRef.current && editorRef.current.setCursorPos) {
+              editorRef.current.setCursorPos(currentCursor.line, currentCursor.column);
+            }
+          }, 10);
+        } catch (error) {
+          console.error("Auto-save failed:", error);
+        }
+      }
+    }, autoSaveInterval * 60 * 1000); // Convert minutes to milliseconds
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
+    };
+  }, [autoSaveEnabled, autoSaveInterval, activeFileId, openFiles, editorState.title, autoSaveShownNotification, cursorPos]);
   
   // UI state
-  const [sidebarActive, setSidebarActive] = useState(true);
+  const [sidebarActive, setSidebarActive] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(() => {
@@ -90,11 +168,6 @@ function App() {
     return Math.min(Math.max(width, 180), 520);
   });
   const [ctrlKPressed, setCtrlKPressed] = useState(false);
-  const [autoSaveEnabled] = useState(() => {
-    const saved = localStorage.getItem('shinku-autosave');
-    return saved ? JSON.parse(saved) : true;
-  });
-  const autoSaveTimerRef = useRef<number | null>(null);
 
   // Toast helper function
   const showToast = useCallback((message: string, type: "success" | "error" | "info" | "warning" = "info", duration = 3000) => {
@@ -162,10 +235,21 @@ function App() {
       setShowUnsavedDialog(true);
       return;
     }
-    // Close all without prompt
+    // Close all and return to welcome page
     setOpenFiles([]);
     setActiveFileId(null);
-    setEditorState(prev => ({ ...prev, content: "", title: "Untitled", is_modified: false, is_saved: true }));
+    setFolderTree([]);
+    setCurrentFolderPath("");
+    setWorkspaceMode(null);
+    setEditorState({
+      content: "",
+      title: "Untitled",
+      is_modified: false,
+      is_saved: true,
+      line_count: 1,
+      cursor_line: 1,
+      cursor_column: 1,
+    });
   }, [unsavedFiles]);
 
   const saveSelectedFiles = useCallback(async (ids: string[]) => {
@@ -182,17 +266,39 @@ function App() {
       }
     }
     setShowUnsavedDialog(false);
-    // After saving, close all
+    // After saving, close all and return to welcome page
     setOpenFiles([]);
     setActiveFileId(null);
-    setEditorState(prev => ({ ...prev, content: "", title: "Untitled", is_modified: false, is_saved: true }));
+    setFolderTree([]);
+    setCurrentFolderPath("");
+    setWorkspaceMode(null);
+    setEditorState({
+      content: "",
+      title: "Untitled",
+      is_modified: false,
+      is_saved: true,
+      line_count: 1,
+      cursor_line: 1,
+      cursor_column: 1,
+    });
   }, [openFiles, handleSaveFileAs, handleSaveFile]);
 
   const dontSaveAndClose = useCallback(() => {
     setShowUnsavedDialog(false);
     setOpenFiles([]);
     setActiveFileId(null);
-    setEditorState(prev => ({ ...prev, content: "", title: "Untitled", is_modified: false, is_saved: true }));
+    setFolderTree([]);
+    setCurrentFolderPath("");
+    setWorkspaceMode(null);
+    setEditorState({
+      content: "",
+      title: "Untitled",
+      is_modified: false,
+      is_saved: true,
+      line_count: 1,
+      cursor_line: 1,
+      cursor_column: 1,
+    });
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -229,20 +335,7 @@ function App() {
         }
       }));
     }
-
-    // Auto-save trigger
-    if (autoSaveEnabled && activeFileId) {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-      autoSaveTimerRef.current = setTimeout(() => {
-        const file = openFiles.find(f => f.id === activeFileId);
-        if (file && file.path && file.path !== 'Untitled') {
-          handleSaveFile();
-        }
-      }, 2000); // Auto-save after 2 seconds of inactivity
-    }
-  }, [activeFileId, editorState, autoSaveEnabled, openFiles, handleSaveFile]);
+  }, [activeFileId, editorState]);
 
   const handleCursorChange = useCallback((line: number, column: number) => {
     setCursorPos({ line, column });
@@ -427,14 +520,40 @@ function App() {
     if (lineNum) {
       const num = parseInt(lineNum, 10);
       if (!isNaN(num) && num > 0) {
-        showToast(`Go to line ${num} feature coming soon`, "info");
+        if (editorRef.current?.setCursorPos) {
+          editorRef.current.setCursorPos(num, 1);
+          editorRef.current.focus();
+          showToast(`Jumped to line ${num}`, "success");
+        }
+      } else {
+        showToast("Invalid line number", "error");
       }
     }
   }, [showToast]);
 
   const handleFormatDocument = useCallback(() => {
-    showToast("Format document feature coming soon", "info");
-  }, [showToast]);
+    if (!activeFileId) {
+      showToast("No active file to format", "error");
+      return;
+    }
+
+    const activeFile = openFiles.find(f => f.id === activeFileId);
+    if (!activeFile) return;
+
+    const currentContent = editorState.title;
+    const lines = currentContent.split('\n');
+    const formatted = lines
+      .map(line => line.trimEnd())
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim() + '\n';
+
+    setEditorState({ ...editorState, title: formatted });
+    setOpenFiles(openFiles.map(f => 
+      f.id === activeFileId ? { ...f, isModified: true, isSaved: false } : f
+    ));
+    showToast("Document formatted", "success");
+  }, [activeFileId, openFiles, editorState, showToast]);
 
   const buildCommands = useCallback(() => {
     return [
@@ -802,99 +921,165 @@ function App() {
   // Keyboard shortcuts handler with Ctrl+K tracking for Ctrl+K Ctrl+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const ctrl = e.ctrlKey || e.metaKey;
+
       // Ctrl+` - Toggle Terminal
-      if (e.ctrlKey && e.key === '`') {
+      if (ctrl && e.key === '`') {
         e.preventDefault();
         setShowTerminal(!showTerminal);
+        return;
       }
-      // Ctrl+K Ctrl+S - Show Shortcuts
-      else if (e.ctrlKey && e.key === 'k' && !ctrlKPressed) {
+
+      // Ctrl+K Ctrl+S chord (track the K press first)
+      if (ctrl && key === 'k' && !ctrlKPressed) {
         e.preventDefault();
         setCtrlKPressed(true);
+        return;
       }
-      // Ctrl+N - New File
-      else if (e.ctrlKey && e.key === 'n' && !e.shiftKey) {
-        e.preventDefault();
-        handleNewFile();
-      }
-      // Ctrl+O - Open File
-      else if (e.ctrlKey && e.key === 'o' && !e.shiftKey) {
-        e.preventDefault();
-        handleOpenFile();
-      }
-      // Ctrl+V - Paste
-      else if (e.ctrlKey && e.key === 'v') {
-        e.preventDefault();
-        handlePaste();
-      }
-      // Ctrl+C - Copy
-      else if (e.ctrlKey && e.key === 'c') {
-        e.preventDefault();
-        handleCopy();
-      }
-      // Ctrl+X - Cut
-      else if (e.ctrlKey && e.key === 'x') {
-        e.preventDefault();
-        handleCut();
-      }
-      // Ctrl+S - Save File
-      else if (e.ctrlKey && e.key === 's' && !e.shiftKey) {
-        e.preventDefault();
-        handleSaveFile();
-      }
-      // Ctrl+Shift+S - Save As
-      else if (e.ctrlKey && e.shiftKey && e.key === 'S') {
-        e.preventDefault();
-        handleSaveFileAs();
-      }
-      // Ctrl+Z - Undo
-      else if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      }
-      // Ctrl+Y - Redo
-      else if (e.ctrlKey && e.key === 'y') {
-        e.preventDefault();
-        handleRedo();
-      }
-      // Ctrl+F - Find & Replace
-      else if (e.ctrlKey && e.key === 'f') {
-        e.preventDefault();
-        setShowFindReplace(true);
-      }
-      // Ctrl+Shift+P - Command Palette
-      else if (e.ctrlKey && e.shiftKey && e.key === 'P') {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      }
-      // Ctrl+, - Preferences
-      else if (e.ctrlKey && e.key === ',') {
-        e.preventDefault();
-        setShowPreferences(true);
-      }
-      // Handle Ctrl+K Ctrl+S combo
-      else if (ctrlKPressed && e.ctrlKey && e.key === 's' && !e.shiftKey) {
+      if (ctrlKPressed && ctrl && key === 's' && !e.shiftKey) {
         e.preventDefault();
         setShowShortcuts(true);
         setCtrlKPressed(false);
+        return;
       }
+
+      // Core shortcuts
+      if (ctrl && key === 'n' && !e.shiftKey) {
+        e.preventDefault();
+        handleNewFile();
+        return;
+      }
+      if (ctrl && key === 'o' && e.shiftKey) {
+        e.preventDefault();
+        handleOpenFolder();
+        return;
+      }
+      if (ctrl && key === 'o' && !e.shiftKey) {
+        e.preventDefault();
+        handleOpenFile();
+        return;
+      }
+      if (ctrl && key === 'w') {
+        e.preventDefault();
+        if (activeFileId) {
+          handleCloseFile(activeFileId);
+        }
+        return;
+      }
+      if (ctrl && key === 's' && !e.shiftKey) {
+        e.preventDefault();
+        handleSaveFile();
+        return;
+      }
+      if (ctrl && e.shiftKey && key === 's') {
+        e.preventDefault();
+        handleSaveFileAs();
+        return;
+      }
+      if (ctrl && key === 'f') {
+        e.preventDefault();
+        setShowFindReplace(true);
+        return;
+      }
+      if (ctrl && key === 'h') {
+        e.preventDefault();
+        setShowFindReplace(true);
+        return;
+      }
+      if (ctrl && key === 'g') {
+        e.preventDefault();
+        handleGoToLine();
+        return;
+      }
+      if (ctrl && key === 'a') {
+        e.preventDefault();
+        handleSelectAll();
+        return;
+      }
+      if (ctrl && key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      if (ctrl && (key === 'y' || (key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+      if (ctrl && key === 'v') {
+        e.preventDefault();
+        handlePaste();
+        return;
+      }
+      if (ctrl && key === 'c') {
+        e.preventDefault();
+        handleCopy();
+        return;
+      }
+      if (ctrl && key === 'x') {
+        e.preventDefault();
+        handleCut();
+        return;
+      }
+      if (ctrl && e.shiftKey && key === 'p') {
+        e.preventDefault();
+        setShowCommandPalette(true);
+        return;
+      }
+      if (ctrl && key === ',') {
+        e.preventDefault();
+        setShowPreferences(true);
+        return;
+      }
+      if (e.shiftKey && e.altKey && key === 'f') {
+        e.preventDefault();
+        handleFormatDocument();
+        return;
+      }
+
       // Escape - Close dialogs and reset Ctrl+K state
-      else if (e.key === 'Escape') {
+      if (key === 'escape') {
         setCtrlKPressed(false);
         setShowFindReplace(false);
         setShowAbout(false);
         setShowShortcuts(false);
         setShowPreferences(false);
+        return;
       }
-      // Reset Ctrl+K if another key is pressed
-      else if (ctrlKPressed && !(e.ctrlKey && e.key === 's')) {
+
+      // Reset Ctrl+K if another key is pressed without completing the chord
+      if (ctrlKPressed) {
         setCtrlKPressed(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [ctrlKPressed, handleNewFile, handleOpenFile, handlePaste, handleCopy, handleCut, handleSaveFile, handleSaveFileAs, handleUndo, handleRedo, handleSelectFile, handleCloseFile, showTerminal]);
+  }, [
+    activeFileId,
+    ctrlKPressed,
+    handleCloseFile,
+    handleCopy,
+    handleCut,
+    handleFormatDocument,
+    handleGoToLine,
+    handleNewFile,
+    handleOpenFile,
+    handleOpenFolder,
+    handlePaste,
+    handleRedo,
+    handleSaveFile,
+    handleSaveFileAs,
+    handleSelectAll,
+    handleUndo,
+    setShowCommandPalette,
+    setShowPreferences,
+    setShowFindReplace,
+    setShowShortcuts,
+    setShowAbout,
+    showTerminal,
+  ]);
 
   // Resizable left panel
   const handleLeftPanelResize = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -1171,8 +1356,53 @@ function App() {
               <button className="close-btn" onClick={() => setShowPreferences(false)}>×</button>
             </div>
             <div className="preferences-content">
-              <h3>Theme</h3>
-              <p>Theme settings coming soon...</p>
+              <div className="preference-section">
+                <h3>Auto-Save</h3>
+                <div className="preference-item">
+                  <label className="preference-label">
+                    <input
+                      type="checkbox"
+                      checked={autoSaveEnabled}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setAutoSaveEnabled(enabled);
+                        localStorage.setItem('shinku-autosave-enabled', enabled.toString());
+                        if (enabled && !autoSaveShownNotification) {
+                          // Reset notification flag when re-enabling
+                          localStorage.setItem('shinku-autosave-notification-shown', 'false');
+                          setAutoSaveShownNotification(false);
+                        }
+                      }}
+                    />
+                    <span>Enable Auto-Save</span>
+                  </label>
+                </div>
+                {autoSaveEnabled && (
+                  <div className="preference-item">
+                    <label className="preference-label-block">
+                      Save Interval (minutes)
+                      <select
+                        value={autoSaveInterval}
+                        onChange={(e) => {
+                          const interval = parseInt(e.target.value, 10);
+                          setAutoSaveInterval(interval);
+                          localStorage.setItem('shinku-autosave-interval', interval.toString());
+                        }}
+                        className="preference-select"
+                      >
+                        <option value={3}>3 minutes</option>
+                        <option value={5}>5 minutes</option>
+                        <option value={10}>10 minutes</option>
+                        <option value={15}>15 minutes</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </div>
+              <div className="preference-section">
+                <h3>Theme</h3>
+                <p>Theme settings coming soon...</p>
+              </div>
             </div>
           </div>
         </div>

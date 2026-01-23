@@ -19,6 +19,8 @@ export interface EditorHandle {
   focus: () => void;
   selectAll: () => void;
   getSelection: () => { from: number; to: number; text: string };
+  getCursorPos: () => { line: number; column: number };
+  setCursorPos: (line: number, column: number) => void;
 }
 const Editor = forwardRef<EditorHandle, EditorProps>(({ content, onChange, onCursorChange }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -117,6 +119,31 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ content, onChange, onCur
         to: sel.to,
         text: view.state.sliceDoc(sel.from, sel.to)
       };
+    },
+    getCursorPos: () => {
+      const view = viewRef.current;
+      if (!view) return { line: 1, column: 1 };
+      const cursor = view.state.selection.main.head;
+      const line = view.state.doc.lineAt(cursor);
+      return {
+        line: line.number,
+        column: cursor - line.from + 1
+      };
+    },
+    setCursorPos: (line: number, column: number) => {
+      const view = viewRef.current;
+      if (!view) return;
+      try {
+        const targetLine = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
+        const targetColumn = Math.max(0, Math.min(column - 1, targetLine.length));
+        const pos = targetLine.from + targetColumn;
+        view.dispatch({
+          selection: { anchor: pos, head: pos },
+          scrollIntoView: true
+        });
+      } catch (error) {
+        console.error('Failed to set cursor position:', error);
+      }
     }
   }), []);
 

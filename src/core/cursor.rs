@@ -3,7 +3,7 @@
 /// The cursor represents the user's current position in the buffer.
 /// It is separate from the buffer to maintain single responsibility.
 
-use crate::core::types::{Position, Direction, CoreResult, CoreError};
+use crate::core::types::{Position, Direction, CoreResult};
 use crate::core::buffer::TextBuffer;
 
 /// Cursor state

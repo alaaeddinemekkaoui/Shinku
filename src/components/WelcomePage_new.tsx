@@ -123,7 +123,7 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
     <div className="welcome-page" onScroll={handleScroll}>
       <div className="welcome-container">
         {/* Hero Section - Shrinks on scroll */}
-        <div
+        <div 
           className="welcome-hero"
           style={{
             transform: `scale(${Math.max(0.5, 1 - scrollPosition / 500)})`,
@@ -132,13 +132,11 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
           }}
         >
           <div className="welcome-branding">
-            <div className="welcome-logo-container">
-              <img 
-                src={welcomeConfig?.logo || "/icons/shinku.png"} 
-                alt="Shinku Logo" 
-                className="welcome-logo" 
-              />
-            </div>
+            {welcomeConfig?.logo && (
+              <div className="welcome-logo-container">
+                <img src={welcomeConfig.logo} alt="Shinku Logo" className="welcome-logo" />
+              </div>
+            )}
             <div className="welcome-title-section">
               <div className="welcome-japanese">{welcomeConfig?.japaneseText || "神紅"}</div>
               <h1 className="welcome-title">{welcomeConfig?.englishTitle || "Shinku"}</h1>
@@ -173,8 +171,9 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
           ))}
         </div>
 
-        {recentItems.length > 0 && scrollPosition > 60 && (
-          <div
+        {/* Recent Files - Fade in last */}
+        {recentItems.length > 0 && (
+          <div 
             className="welcome-recent"
             style={{
               opacity: Math.min(1, Math.max(0, (scrollPosition - 100) / 200)),
@@ -190,26 +189,17 @@ const WelcomePage: React.FC<WelcomePageProps> = ({
                   onClick={() => onOpenRecent?.(item.path)}
                   title={item.path}
                 >
-                  <span className="recent-icon">{getIcon(item.type)}</span>
+                  <div className="recent-icon">{getIcon(item.type)}</div>
                   <div className="recent-info">
                     <div className="recent-name">{item.name}</div>
                     <div className="recent-time">{formatDate(item.lastOpened)}</div>
                   </div>
-                  <span className="recent-path">{item.type === 'folder' ? 'Folder' : 'File'}</span>
+                  <div className="recent-type">{item.type}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
-
-        <div className="welcome-tips">
-          <h3>Tips</h3>
-          <ul>
-            <li>Folder Workspace: Full file & folder management in one location</li>
-            <li>Files Workspace: Combine files from different directories</li>
-            <li>Recent items are saved automatically</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

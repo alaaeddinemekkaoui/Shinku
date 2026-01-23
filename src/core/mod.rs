@@ -11,8 +11,5 @@ pub mod undo;
 pub mod editor;
 
 // Re-export commonly used types
-pub use types::{Position, Direction, CoreResult, CoreError};
-pub use buffer::TextBuffer;
-pub use cursor::Cursor;
-pub use selection::Selection;
+pub use types::{Position, Direction};
 pub use editor::Editor;

@@ -10,4 +10,3 @@
 
 pub mod fs;
 
-pub use fs::{read_file, write_file, file_exists};

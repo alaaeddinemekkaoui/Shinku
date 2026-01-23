@@ -70,6 +70,7 @@ fn main() {
             tauri_commands::redo,
             tauri_commands::get_app_info,
             tauri_commands::execute_terminal_command,
+            tauri_commands::get_current_directory,
             tauri_commands::open_external_terminal,
         ])
         .run(tauri::generate_context!())

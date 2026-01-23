@@ -401,8 +401,15 @@ pub fn get_app_info() -> AppInfoData {
 }
 
 #[tauri::command]
-pub async fn execute_terminal_command(command: String, working_dir: String) -> Result<String, String> {
-    use std::process::Command;
+pub async fn execute_terminal_command(
+    command: String,
+    working_dir: String,
+    shell: Option<String>,
+    window: tauri::Window,
+) -> Result<String, String> {
+    use std::process::{Command, Stdio};
+    use std::io::{BufRead, BufReader};
+    use std::thread;
     
     let working_path = if working_dir.is_empty() {
         std::env::current_dir().map_err(|e| e.to_string())?
@@ -410,27 +417,64 @@ pub async fn execute_terminal_command(command: String, working_dir: String) -> R
         PathBuf::from(&working_dir)
     };
     
-    // Determine shell based on OS
+    // Determine shell based on parameter or OS default
     #[cfg(target_os = "windows")]
-    let (shell, args) = ("cmd.exe", vec!["/C", &command]);
+    let (shell_cmd, args) = match shell.as_deref() {
+        Some("powershell") => ("powershell.exe", vec!["-NoProfile", "-Command", &command]),
+        Some("cmd") => ("cmd.exe", vec!["/C", &command]),
+        _ => ("powershell.exe", vec!["-NoProfile", "-Command", &command]), // Default to PowerShell
+    };
     
     #[cfg(not(target_os = "windows"))]
-    let (shell, args) = ("sh", vec!["-c", &command]);
+    let (shell_cmd, args) = ("sh", vec!["-c", &command]);
     
-    let output = Command::new(shell)
+    let mut child = Command::new(shell_cmd)
         .args(&args)
         .current_dir(&working_path)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("Failed to execute command: {}", e))?;
     
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    
-    if output.status.success() {
-        Ok(if stdout.is_empty() { "(command executed successfully)".to_string() } else { stdout })
-    } else {
-        Ok(if stderr.is_empty() { "(command failed)".to_string() } else { stderr })
+    // Stream stdout in real-time
+    if let Some(stdout) = child.stdout.take() {
+        let window_clone = window.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    let _ = window_clone.emit("terminal-output", line);
+                }
+            }
+        });
     }
+    
+    // Stream stderr in real-time
+    if let Some(stderr) = child.stderr.take() {
+        let window_clone = window.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    let _ = window_clone.emit("terminal-output", line);
+                }
+            }
+        });
+    }
+    
+    let status = child.wait().map_err(|e| format!("Failed to wait for command: {}", e))?;
+    
+    // Emit completion event
+    let _ = window.emit("terminal-complete", status.success());
+    
+    Ok(String::new())
+}
+
+#[tauri::command]
+pub fn get_current_directory() -> Result<String, String> {
+    std::env::current_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .map_err(|e| format!("Failed to get current directory: {}", e))
 }
 
 #[tauri::command]
